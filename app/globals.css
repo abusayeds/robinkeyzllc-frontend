@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f4f7f5;
+  --foreground: #0b1f17;
+  --brand-dark: #0b1f17;
+  --brand-forest: #0f2e22;
+  --brand-accent: #7cff6b;
+  --brand-muted: #8ba89a;
+  --brand-soft: #f4f7f5;
+  --brand-border: #e5ebe8;
+}
+
+html,
+body {
+  max-width: 100vw;
+  min-height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Prevent iOS Safari from auto-zooming the viewport when a form field is
+   focused — it only does this when the field's font-size is under 16px. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Sticky first column for horizontally-scrolling tables (mobile + desktop). */
+.sticky-col-1 {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+/* Sticky action column (e.g. Offer/Draft buttons) so it stays reachable
+   without scrolling all the way to the right edge of a wide table. */
+.sticky-col-end {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+}

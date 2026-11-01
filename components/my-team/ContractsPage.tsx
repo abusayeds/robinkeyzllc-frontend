@@ -1,0 +1,149 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useLeagueTeamsQuery } from "@/lib/store/api/endpoints/teamApi";
+import {
+  useTeamRosterQuery,
+  type RosterPlayer,
+} from "@/lib/store/api/endpoints/rosterApi";
+import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
+import { useAppSelector } from "@/lib/store/hooks";
+import CapSummaryCards from "./CapSummaryCards";
+import ContractsTable from "./ContractsTable";
+import RosterPlayerModal from "./RosterPlayerModal";
+import { CONTRACTS_SUBNAV } from "./subnav";
+import TeamSelector from "./TeamSelector";
+
+/** How many seasons the contract grid shows, matching the import template. */
+const SEASON_COLUMNS = 6;
+
+export default function ContractsPage() {
+  const pathname = usePathname();
+  const activeLeague = useAppSelector((s) => s.activeLeague.current);
+  const leagueId = activeLeague?.id;
+
+  const { data: memberships = [] } = useMyLeaguesQuery(undefined, {
+    skip: !leagueId,
+  });
+  const myTeamId = useMemo(
+    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    [memberships, leagueId],
+  );
+
+  const { data: teamList } = useLeagueTeamsQuery(leagueId as number, {
+    skip: !leagueId,
+  });
+  const teams = useMemo(() => teamList?.teams ?? [], [teamList]);
+
+  const [viewTeamId, setViewTeamId] = useState<number | null>(null);
+  const activeTeamId = viewTeamId ?? myTeamId ?? teams[0]?.id ?? null;
+
+  const { data, isLoading } = useTeamRosterQuery(
+    { leagueId: leagueId as number, teamId: activeTeamId as number },
+    { skip: !leagueId || !activeTeamId },
+  );
+
+  const [detail, setDetail] = useState<RosterPlayer | null>(null);
+
+  const seasons = useMemo(() => {
+    if (!data) return [];
+    return Array.from(
+      { length: SEASON_COLUMNS },
+      (_, index) => data.seasonStartYear + index,
+    );
+  }, [data]);
+
+  if (!leagueId) {
+    return (
+      <p className="text-sm text-brand-muted">
+        Choose a league to see its contracts.
+      </p>
+    );
+  }
+
+  if (teams.length === 0) {
+    return (
+      <div className="rounded-xl border border-brand-border bg-white p-8 text-center shadow-card">
+        <p className="text-sm font-semibold text-brand-dark">
+          This league has no teams yet.
+        </p>
+        <p className="mt-1 text-sm text-brand-muted">
+          The commissioner creates them from the league office.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-brand-dark">Contracts</h1>
+          <p className="text-sm text-brand-muted">
+            Every contract on this team, season by season.
+          </p>
+        </div>
+        <TeamSelector
+          teams={teams}
+          value={activeTeamId}
+          onChange={setViewTeamId}
+          myTeamId={myTeamId}
+        />
+      </div>
+
+      <nav className="flex flex-wrap items-center gap-1 border-b border-brand-border">
+        {CONTRACTS_SUBNAV.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className={`relative px-3 py-2.5 text-sm transition ${
+              pathname === item.href
+                ? "font-semibold text-brand-cta-dark"
+                : "font-medium text-brand-muted hover:text-brand-dark"
+            }`}
+          >
+            {item.label}
+            {pathname === item.href ? (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-cta" />
+            ) : null}
+          </a>
+        ))}
+      </nav>
+
+      {isLoading || !data ? (
+        <p className="text-sm text-brand-muted">Loading…</p>
+      ) : (
+        <>
+          <CapSummaryCards cap={data.cap} counts={data.counts} rules={data.rules} />
+
+          {data.players.length === 0 ? (
+            <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
+              <p className="text-sm font-semibold text-brand-dark">
+                No contracts on this team.
+              </p>
+              <p className="mt-1 text-sm text-brand-muted">
+                Contracts arrive with Player Import, and change through trades
+                and free agency.
+              </p>
+            </div>
+          ) : (
+            <ContractsTable
+              players={data.players}
+              seasons={seasons}
+              deadMoneyRows={data.deadMoneyRows}
+              capHoldRows={data.capHoldRows}
+              onView={setDetail}
+            />
+          )}
+
+          <RosterPlayerModal
+            player={detail}
+            seasonStartYear={data.seasonStartYear}
+            onClose={() => setDetail(null)}
+          />
+        </>
+      )}
+    </div>
+  );
+}
