@@ -40,6 +40,8 @@ export type TradingRules = {
   allowTradeExceptions: boolean;
   allowTradingTradeExceptions: boolean;
   allowDraftPickTrading: boolean;
+  /** Rule 12.1 — how many drafts ahead a pick may be traded. */
+  pickTradingWindowDrafts: number;
   commissionerTradeApproval: boolean;
 };
 
@@ -152,6 +154,8 @@ export type LeagueMember = {
   image: string | null;
   role: ApiLeagueRole;
   hasTeam: boolean;
+  /** The team they manage in this league, or null when they hold none. */
+  team: { id: number; name: string; abbr: string; logo: string | null } | null;
   joinedAt: string;
 };
 

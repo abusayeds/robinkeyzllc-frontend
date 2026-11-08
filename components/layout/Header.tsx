@@ -22,8 +22,8 @@ export default function Header({
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const team = useAppSelector((state) => state.team);
-  const league = useAppSelector((state) => state.league);
+  const user = useAppSelector((state) => state.auth.user);
+  const activeLeague = useAppSelector((state) => state.activeLeague.current);
   const role = useAppSelector((state) => state.auth.role);
   const adminViewingLeague = useAppSelector(
     (state) => state.platform.adminViewingLeague
@@ -46,7 +46,11 @@ export default function Header({
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ") ?? "Dashboard";
   const title = pageTitles[pathname] ?? fallbackTitle;
-  const subtitle = pageSubtitles[pathname] ?? `Welcome back, ${team.ownerName}`;
+  // Both the greeting and the league name come from the session, which the
+  // server render cannot see, so they wait for hydration like the role does.
+  const subtitle =
+    pageSubtitles[pathname] ??
+    (hydrated && user?.name ? `Welcome back, ${user.name}` : "Welcome back");
 
   return (
     <header className="flex shrink-0 items-center justify-between gap-3 bg-brand-forest px-4 py-4 text-white sm:px-6 sm:py-5 lg:px-8">
@@ -97,10 +101,12 @@ export default function Header({
             </span>
             Exit League
           </button>
-        ) : (
+        ) : hydrated && activeLeague ? (
           <p className="hidden text-sm font-medium text-brand-accent md:block">
-            {league.name}
+            {activeLeague.name}
           </p>
+        ) : (
+          <p className="hidden text-sm font-medium text-brand-accent md:block" />
         )}
 
         <HeaderSearchDesktop />

@@ -2,7 +2,7 @@ import type {
   Playoffs,
   PlayoffSeries,
   PlayoffTeam,
-} from "@/lib/store/features/leagueSlice";
+} from "@/lib/store/api/endpoints/standingsApi";
 
 function TeamRow({
   team,

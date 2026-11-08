@@ -44,7 +44,9 @@ const ROLES: PlatformRole[] = [
   "Owner",
 ];
 
-const initialState: PlatformState = {
+// Exported so the store can rebuild the slice around the one field it
+// restores from localStorage.
+export const platformInitialState: PlatformState = {
   users: ROLES.map((role) => ({
     id: nanoid(6),
     name: "Robin Keyz",
@@ -66,7 +68,7 @@ const initialState: PlatformState = {
 
 const platformSlice = createSlice({
   name: "platform",
-  initialState,
+  initialState: platformInitialState,
   reducers: {
     removePlatformUser(state, action: PayloadAction<string>) {
       state.users = state.users.filter((u) => u.id !== action.payload);

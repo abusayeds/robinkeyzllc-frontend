@@ -2,13 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { FiAlertTriangle, FiSearch } from "react-icons/fi";
+import { getApiErrorMessage } from "@/lib/store/api/baseApi";
 import {
   SLOT_LABEL,
   STATUS_LABEL,
   useLeagueRostersQuery,
+  useSetRosterSlotMutation,
   type RosterPlayer,
   type RosterTeam,
+  type SlotType,
 } from "@/lib/store/api/endpoints/rosterApi";
+import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
@@ -25,7 +29,48 @@ const initials = (name: string) =>
 const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 
-function PlayerRow({ player }: { player: RosterPlayer }) {
+const SLOT_OPTIONS: SlotType[] = ["standard", "twoWay", "injuredReserve"];
+
+/**
+ * One player. The commissioner may move a rostered player between slots —
+ * the nav has always promised "view and manage" — so the status cell becomes
+ * a control for them and stays plain text for everyone else.
+ */
+function PlayerRow({
+  player,
+  leagueId,
+  teamId,
+  canEdit,
+}: {
+  player: RosterPlayer;
+  leagueId?: number;
+  /** Absent for a player the league holds without a franchise. */
+  teamId?: number;
+  canEdit?: boolean;
+}) {
+  const [setSlot, { isLoading }] = useSetRosterSlotMutation();
+  const [slotError, setSlotError] = useState<string | null>(null);
+
+  const editable =
+    Boolean(canEdit && leagueId && teamId) && player.status === "rostered";
+
+  async function changeSlot(slotType: SlotType) {
+    if (!leagueId || !teamId) return;
+    setSlotError(null);
+    try {
+      await setSlot({
+        leagueId,
+        teamId,
+        leaguePlayerId: player.id,
+        slotType,
+      }).unwrap();
+    } catch (e) {
+      // The two-way limit and the roster maximum are enforced on the server,
+      // so the reason comes back with the refusal.
+      setSlotError(getApiErrorMessage(e, "That slot could not be changed."));
+    }
+  }
+
   const detail = [
     player.position,
     player.nbaTeam,
@@ -67,9 +112,29 @@ function PlayerRow({ player }: { player: RosterPlayer }) {
         {player.contract ? player.contract.years : "—"}
       </td>
       <td className="px-4 py-2.5 text-center text-brand-muted">
-        {player.status === "rostered"
-          ? SLOT_LABEL[player.slotType]
-          : STATUS_LABEL[player.status]}
+        {editable ? (
+          <>
+            <select
+              value={player.slotType}
+              disabled={isLoading}
+              onChange={(e) => void changeSlot(e.target.value as SlotType)}
+              className="rounded-md border border-brand-border bg-white px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-cta/30 disabled:opacity-50"
+            >
+              {SLOT_OPTIONS.map((slot) => (
+                <option key={slot} value={slot}>
+                  {SLOT_LABEL[slot]}
+                </option>
+              ))}
+            </select>
+            {slotError ? (
+              <p className="mt-1 text-[10px] text-red-600">{slotError}</p>
+            ) : null}
+          </>
+        ) : player.status === "rostered" ? (
+          SLOT_LABEL[player.slotType]
+        ) : (
+          STATUS_LABEL[player.status]
+        )}
       </td>
       <td className="px-4 py-2.5 text-right text-brand-dark">
         {player.capHit === null ? (
@@ -85,9 +150,13 @@ function PlayerRow({ player }: { player: RosterPlayer }) {
 function TeamCard({
   team,
   maxRosterSize,
+  leagueId,
+  canEdit,
 }: {
   team: RosterTeam;
   maxRosterSize: number | null;
+  leagueId: number;
+  canEdit: boolean;
 }) {
   const payroll = useMemo(
     () => team.players.reduce((total, p) => total + (p.capHit ?? 0), 0),
@@ -152,7 +221,13 @@ function TeamCard({
             </thead>
             <tbody className="divide-y divide-brand-border">
               {team.players.map((player) => (
-                <PlayerRow key={player.id} player={player} />
+                <PlayerRow
+                  key={player.id}
+                  player={player}
+                  leagueId={leagueId}
+                  teamId={team.id}
+                  canEdit={canEdit}
+                />
               ))}
             </tbody>
           </table>
@@ -165,6 +240,7 @@ function TeamCard({
 export default function RosterManagementPage() {
   const activeLeague = useAppSelector((s) => s.activeLeague.current);
   const leagueId = activeLeague?.id;
+  const canEdit = canManageLeague(activeLeague);
 
   const { data, isLoading } = useLeagueRostersQuery(leagueId as number, {
     skip: !leagueId,
@@ -280,6 +356,8 @@ export default function RosterManagementPage() {
           key={team.id}
           team={team}
           maxRosterSize={rules?.maxRosterSize ?? null}
+          leagueId={leagueId}
+          canEdit={canEdit}
         />
       ))}
 

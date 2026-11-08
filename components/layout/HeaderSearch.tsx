@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiSearch, FiX } from "react-icons/fi";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { useLeagueRostersQuery } from "@/lib/store/api/endpoints/rosterApi";
+import { useLeagueMembersQuery } from "@/lib/store/api/endpoints/leagueSettingsApi";
 import { setContractsViewTeamId } from "@/lib/store/features/uiSlice";
 import TeamLogo from "@/components/ui/TeamLogo";
 
@@ -12,56 +14,84 @@ type SearchResult = {
   id: string;
   name: string;
   detail: string;
-  teamId: string;
+  /** Null for a member who has not been given a team yet. */
+  teamId: number | null;
   teamName: string;
   teamLogo?: string;
 };
 
+/**
+ * Searches the league the user is standing in: its rosters and its members.
+ *
+ * Both queries are skipped until something is typed, so opening the box
+ * costs nothing. RTK Query caches them, so the keystrokes after the first
+ * filter what is already in hand rather than asking again.
+ */
 function useSearchResults(query: string) {
-  const leagueTeams = useAppSelector((state) => state.league.leagueTeams);
-  const rosters = useAppSelector((state) => state.rosters.byTeam);
+  const leagueId = useAppSelector((state) => state.activeLeague.current?.id);
+  const q = query.trim().toLowerCase();
+  const skip = !leagueId || q.length === 0;
+
+  const { data: rosters } = useLeagueRostersQuery(leagueId as number, {
+    skip,
+  });
+  const { data: members } = useLeagueMembersQuery(leagueId as number, {
+    skip,
+  });
 
   return useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return { players: [] as SearchResult[], users: [] as SearchResult[] };
-
-    const teamById = new Map(leagueTeams.map((t) => [t.id, t]));
+    if (skip) {
+      return { players: [] as SearchResult[], users: [] as SearchResult[] };
+    }
 
     const players: SearchResult[] = [];
-    for (const [teamId, roster] of Object.entries(rosters)) {
-      const team = teamById.get(teamId);
-      for (const p of roster) {
-        if (p.name.toLowerCase().includes(q)) {
-          players.push({
-            kind: "player",
-            id: p.id,
-            name: p.name,
-            detail: `${p.pos} · ${p.nbaTeam}`,
-            teamId,
-            teamName: team?.name ?? teamId,
-            teamLogo: team?.logo,
-          });
-        }
+    for (const team of rosters?.teams ?? []) {
+      for (const player of team.players) {
+        if (!player.name.toLowerCase().includes(q)) continue;
+        players.push({
+          kind: "player",
+          id: String(player.id),
+          name: player.name,
+          detail: [player.position, player.nbaTeam]
+            .filter(Boolean)
+            .join(" · "),
+          teamId: team.id,
+          teamName: team.name,
+          teamLogo: team.logo ?? undefined,
+        });
       }
     }
 
-    const users: SearchResult[] = leagueTeams
-      .filter(
-        (t) =>
-          t.owner.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
-      )
-      .map((t) => ({
-        kind: "user" as const,
-        id: t.id,
-        name: t.owner,
-        detail: t.name,
-        teamId: t.id,
-        teamName: t.name,
-        teamLogo: t.logo,
-      }));
+    // A free agent belongs to the league but to no team, and is worth
+    // finding: he is exactly who a commissioner goes looking for.
+    for (const player of rosters?.unassigned ?? []) {
+      if (!player.name.toLowerCase().includes(q)) continue;
+      players.push({
+        kind: "player",
+        id: String(player.id),
+        name: player.name,
+        detail: [player.position, player.nbaTeam].filter(Boolean).join(" · "),
+        teamId: null,
+        teamName: "Free agent",
+      });
+    }
+
+    const users: SearchResult[] = [];
+    for (const member of members ?? []) {
+      if (!member.name.toLowerCase().includes(q)) continue;
+      users.push({
+        kind: "user",
+        id: String(member.userId),
+        name: member.name,
+        detail: member.email,
+        teamId: member.team?.id ?? null,
+        teamName: member.team?.name ?? "No team yet",
+        teamLogo: member.team?.logo ?? undefined,
+      });
+    }
 
     return { players: players.slice(0, 6), users: users.slice(0, 6) };
-  }, [query, leagueTeams, rosters]);
+  }, [skip, q, rosters, members]);
 }
 
 function ResultsList({
@@ -152,7 +182,9 @@ function useSelectResult() {
       router.push("/league-office/teams");
       return;
     }
-    dispatch(setContractsViewTeamId(result.teamId));
+    dispatch(
+      setContractsViewTeamId(result.teamId ? String(result.teamId) : null),
+    );
     router.push("/my-team/contracts");
   };
 }

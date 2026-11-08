@@ -19,7 +19,13 @@ import {
   HiOutlineUserGroup,
   HiOutlineHome,
 } from "react-icons/hi";
-import { TbTrophy, TbShieldCog, TbFileImport } from "react-icons/tb";
+import {
+  TbTrophy,
+  TbShieldCog,
+  TbFileImport,
+  TbCake,
+  TbChecklist,
+} from "react-icons/tb";
 import {
   FiUser,
   FiHelpCircle,
@@ -140,6 +146,11 @@ export const commissionerNav: NavSection[] = [
     title: "OVERVIEW",
     items: [
       { label: "League Office", href: "/league-office", icon: TbShieldCog },
+      {
+        label: "Action Center",
+        href: "/league-office/action-center",
+        icon: TbChecklist,
+      },
     ],
   },
   {
@@ -195,6 +206,7 @@ export const adminNav: NavSection[] = [
     items: [
       { label: "Leagues", href: "/platform/leagues", icon: LuBuilding2 },
       { label: "Users", href: "/platform/users", icon: LuUsers },
+      { label: "Player Birthdates", href: "/platform/birthdates", icon: TbCake },
     ],
   },
   {
@@ -240,6 +252,8 @@ export const pageSubtitles: Record<string, string> = {
   "/platform": "Here's what's happening across AVORA.",
   "/platform/users": "Here's what's happening across AVORA.",
   "/platform/leagues": "Here's what's happening across AVORA.",
+  "/platform/birthdates":
+    "Load player birthdates from a CSV. The NBA data feed does not carry them.",
   "/platform/settings": "Manage your admin profile and system configurations.",
   "/settings": "Manage your profile and your league's information pages.",
   "/settings/profile": "Your account details and password.",
@@ -268,6 +282,7 @@ export const pageTitles: Record<string, string> = {
   "/platform": "Platform Overview",
   "/platform/users": "Users",
   "/platform/leagues": "Leagues",
+  "/platform/birthdates": "Player Birthdates",
   "/platform/settings": "Settings",
   "/dashboard": "Dashboard",
   "/league/standings": "Standings",

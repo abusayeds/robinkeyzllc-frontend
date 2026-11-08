@@ -22,7 +22,9 @@ type AuthState = {
   role: UserRole;
 };
 
-const initialState: AuthState = {
+// Exported so the store can merge a restored session onto it. A partial
+// saved shape would otherwise leave fields undefined.
+export const authInitialState: AuthState = {
   isAuthenticated: false,
   token: null,
   user: null,
@@ -36,7 +38,7 @@ const toUiRole = (user?: AuthUser | null): UserRole =>
 
 const authSlice = createSlice({
   name: "auth",
-  initialState,
+  initialState: authInitialState,
   reducers: {
     setCredentials(
       state,

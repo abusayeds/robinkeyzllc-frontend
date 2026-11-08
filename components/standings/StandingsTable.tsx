@@ -1,4 +1,5 @@
-import type { StandingRow } from "@/lib/store/features/leagueSlice";
+import TeamLogo from "@/components/ui/TeamLogo";
+import type { StandingRow } from "@/lib/store/api/endpoints/standingsApi";
 import { gamesBack, pct, pctTone } from "./utils";
 
 function StreakBadge({ streak }: { streak: string }) {
@@ -14,17 +15,20 @@ function StreakBadge({ streak }: { streak: string }) {
   );
 }
 
-function TeamCell({ row }: { row: StandingRow }) {
+function TeamCell({ row, mine }: { row: StandingRow; mine: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-forest text-[11px] font-bold text-brand-accent">
-        {row.team.charAt(0)}
-      </span>
+      <TeamLogo
+        name={row.team}
+        src={row.logo}
+        className="h-7 w-7 text-[11px]"
+        rounded="rounded-md"
+      />
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-brand-dark">
           {row.team}
         </p>
-        {row.yourTeam ? (
+        {mine ? (
           <p className="text-[10px] font-semibold tracking-wide text-brand-cta-dark">
             YOUR TEAM
           </p>
@@ -41,9 +45,11 @@ const td = "px-3 py-3 text-sm text-brand-dark";
 export default function StandingsTable({
   rows,
   showConf,
+  myTeamId,
 }: {
   rows: StandingRow[];
   showConf?: boolean;
+  myTeamId?: number | null;
 }) {
   const leader = rows[0];
   return (
@@ -71,14 +77,14 @@ export default function StandingsTable({
             <tr
               key={row.id}
               className={
-                row.yourTeam
+                row.id === myTeamId
                   ? "bg-brand-cta/5"
                   : "transition hover:bg-brand-soft"
               }
             >
               <td className={`${td} w-10 text-brand-muted`}>{index + 1}</td>
               <td className={td}>
-                <TeamCell row={row} />
+                <TeamCell row={row} mine={row.id === myTeamId} />
               </td>
               {showConf ? (
                 <td className={`${td} text-center text-brand-muted`}>

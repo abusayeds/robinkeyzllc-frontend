@@ -7,7 +7,7 @@ import {
 import type {
   TransactionItem,
   TransactionType,
-} from "@/lib/store/features/transactionsSlice";
+} from "@/lib/store/api/endpoints/transactionsApi";
 
 const iconConfig: Record<
   TransactionType,

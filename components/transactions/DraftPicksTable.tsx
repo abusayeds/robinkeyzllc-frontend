@@ -1,9 +1,6 @@
 import { Fragment } from "react";
 import { FiDownload } from "react-icons/fi";
-import type {
-  DraftPickAsset,
-  PickProtectionKind,
-} from "@/lib/store/features/transactionsSlice";
+import type { DraftPickRow, PickProtectionKind } from "./pickRows";
 
 const PROTECTION: Record<PickProtectionKind, { label: string; dot: string }> = {
   top10: { label: "Top 10 protected", dot: "bg-amber-500" },
@@ -19,9 +16,11 @@ const td = "px-4 py-3 align-top text-sm text-brand-dark";
 export default function DraftPicksTable({
   picks,
   lastSynced,
+  onExport,
 }: {
-  picks: DraftPickAsset[];
+  picks: DraftPickRow[];
   lastSynced: string;
+  onExport?: () => void;
 }) {
   const years = Array.from(new Set(picks.map((p) => p.year)));
 
@@ -41,22 +40,30 @@ export default function DraftPicksTable({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
-          >
-            All Picks
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
-          >
-            <FiDownload className="h-3.5 w-3.5" />
-            Export
-          </button>
+          {/* Was an "All Picks" button with no handler and nothing to
+              filter against: the table already shows every pick held. */}
+          <span className="rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white">
+            {picks.length} pick{picks.length === 1 ? "" : "s"}
+          </span>
+          {onExport ? (
+            <button
+              type="button"
+              onClick={onExport}
+              className="flex items-center gap-2 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
+            >
+              <FiDownload className="h-3.5 w-3.5" />
+              Export
+            </button>
+          ) : null}
         </div>
       </div>
 
+      {picks.length === 0 ? (
+        <div className="rounded-xl border border-brand-border bg-white p-10 text-center text-sm text-brand-muted shadow-card">
+          This team holds no draft picks. A commissioner generates them from
+          Draft Picks in the League Office.
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse">
@@ -133,6 +140,7 @@ export default function DraftPicksTable({
           </span>
         </div>
       </div>
+      )}
     </div>
   );
 }

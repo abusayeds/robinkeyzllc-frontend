@@ -3,9 +3,9 @@
 import { useEffect, useMemo } from "react";
 import { FiX } from "react-icons/fi";
 import type {
-  LeagueTeam,
+  MatchupTeam,
   ScheduleMatchup,
-} from "@/lib/store/features/leagueSlice";
+} from "@/lib/store/api/endpoints/standingsApi";
 import TeamLogo from "@/components/ui/TeamLogo";
 
 export default function SeasonScheduleModal({
@@ -17,9 +17,9 @@ export default function SeasonScheduleModal({
 }: {
   open: boolean;
   onClose: () => void;
-  team?: LeagueTeam;
+  team?: MatchupTeam;
   schedule: ScheduleMatchup[];
-  teams: Map<string, LeagueTeam>;
+  teams: Map<number, MatchupTeam>;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -90,8 +90,12 @@ export default function SeasonScheduleModal({
               </p>
               <ul className="divide-y divide-brand-border">
                 {list.map((matchup) => {
-                  const home = teams.get(matchup.homeId);
-                  const away = teams.get(matchup.awayId);
+                  const home = matchup.homeId
+                    ? teams.get(matchup.homeId)
+                    : undefined;
+                  const away = matchup.awayId
+                    ? teams.get(matchup.awayId)
+                    : undefined;
                   const mine =
                     team &&
                     (matchup.homeId === team.id || matchup.awayId === team.id);

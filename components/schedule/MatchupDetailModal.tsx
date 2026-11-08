@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 import { FiX } from "react-icons/fi";
-import type {
-  LeagueTeam,
-  ScheduleMatchup,
-} from "@/lib/store/features/leagueSlice";
+import {
+  useMatchupDetailQuery,
+  type MatchupTeam,
+  type ScheduleMatchup,
+} from "@/lib/store/api/endpoints/standingsApi";
+import { useAppSelector } from "@/lib/store/hooks";
 import TeamLogo from "@/components/ui/TeamLogo";
 import { centerLabel, formatCategory } from "./utils";
 
@@ -22,11 +24,24 @@ export default function MatchupDetailModal({
   onViewFull,
 }: {
   matchup: ScheduleMatchup | null;
-  home?: LeagueTeam;
-  away?: LeagueTeam;
+  home?: MatchupTeam;
+  away?: MatchupTeam;
   onClose: () => void;
-  onViewFull: (id: string) => void;
+  onViewFull: (id: number) => void;
 }) {
+  const activeLeague = useAppSelector((s) => s.activeLeague.current);
+
+  // One at a time, and only while open. The list this opens from carries
+  // no category rows: 150 matchups x 9 would be most of a season's data
+  // fetched to show one card.
+  const { data: detail } = useMatchupDetailQuery(
+    {
+      leagueId: activeLeague?.id as number,
+      matchupId: matchup?.id as number,
+    },
+    { skip: !activeLeague?.id || !matchup },
+  );
+
   useEffect(() => {
     if (!matchup) return;
     function onKey(e: KeyboardEvent) {
@@ -106,7 +121,7 @@ export default function MatchupDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {matchup.categories ? (
+          {detail?.categories.length ? (
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
@@ -116,7 +131,7 @@ export default function MatchupDetailModal({
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-border">
-                {matchup.categories.map((cat) => (
+                {detail.categories.map((cat) => (
                   <tr key={cat.label}>
                     <td
                       className={`py-2 text-left font-semibold tabular-nums ${

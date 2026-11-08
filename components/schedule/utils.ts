@@ -1,10 +1,10 @@
 import type {
-  LeagueTeam,
+  MatchupTeam,
   MatchupStatus,
   ScheduleMatchup,
-} from "@/lib/store/features/leagueSlice";
+} from "@/lib/store/api/endpoints/standingsApi";
 
-export function teamMap(teams: LeagueTeam[]) {
+export function teamMap(teams: MatchupTeam[]) {
   return new Map(teams.map((team) => [team.id, team]));
 }
 
@@ -44,13 +44,12 @@ export function centerLabel(matchup: ScheduleMatchup) {
 }
 
 export function wonCategories(matchup: ScheduleMatchup, side: "home" | "away") {
-  if (!matchup.categories) return [];
-  return matchup.categories
-    .filter((c) => (side === "home" ? c.homeWins === true : c.homeWins === false))
-    .map((c) => c.label);
+  return side === "home"
+    ? matchup.homeWonCategories
+    : matchup.awayWonCategories;
 }
 
-export function resultFor(matchup: ScheduleMatchup, teamId: string) {
+export function resultFor(matchup: ScheduleMatchup, teamId: number | null) {
   if (matchup.status === "upcoming") return null;
   const isHome = matchup.homeId === teamId;
   const own = isHome ? matchup.homeScore : matchup.awayScore;
@@ -71,17 +70,22 @@ export function statLine(percent: boolean, value: number) {
   return formatCategory(value, percent);
 }
 
-export function weekRange(week: number) {
-  const anchor = new Date(2025, 4, 12); // Week 20 starts Mon May 12, 2025
-  const start = new Date(anchor);
-  start.setDate(anchor.getDate() + (week - 20) * 7);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  const fmt = (d: Date, withYear = false) =>
-    d.toLocaleDateString("en-US", {
+/**
+ * The week's dates, from the week itself.
+ *
+ * Used to be counted off a fixed anchor date, which only ever read right
+ * for the one season the mock was written in.
+ */
+export function weekRange(startDate?: string, endDate?: string) {
+  if (!startDate || !endDate) return "";
+
+  const fmt = (value: string, withYear = false) =>
+    new Date(value).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
+      timeZone: "UTC",
       ...(withYear ? { year: "numeric" } : {}),
     });
-  return `${fmt(start)} — ${fmt(end, true)}`;
+
+  return `${fmt(startDate)} — ${fmt(endDate, true)}`;
 }

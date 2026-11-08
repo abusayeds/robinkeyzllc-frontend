@@ -6,11 +6,17 @@ import {
   TIER_LABEL,
   TIER_TONE,
   seasonTag,
+  useLeagueHardCapsQuery,
   useLeagueSalariesQuery,
   type SalaryCap,
   type SalaryContract,
   type SalaryTeam,
+  type TeamHardCap,
 } from "@/lib/store/api/endpoints/salaryApi";
+import {
+  useTradeExceptionsQuery,
+  type TradeExceptionRow,
+} from "@/lib/store/api/endpoints/tradeApi";
 import { useAppSelector } from "@/lib/store/hooks";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
@@ -24,10 +30,26 @@ const short = (value: number) => {
   return `$${value}`;
 };
 
+const formatExpiry = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
 const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 
-function CapBar({ team, cap }: { team: SalaryTeam; cap: SalaryCap }) {
+function CapBar({
+  team,
+  cap,
+  hardCap,
+}: {
+  team: SalaryTeam;
+  cap: SalaryCap;
+  hardCap?: TeamHardCap;
+}) {
   if (cap.salaryCap <= 0) return null;
 
   // Measured against the second apron so every team is drawn on one scale and
@@ -53,6 +75,107 @@ function CapBar({ team, cap }: { team: SalaryTeam; cap: SalaryCap }) {
         style={{ left: `${taxMark}%` }}
         title={`Luxury tax ${money(cap.luxuryTax)}`}
       />
+      {/* Rule 4.1 — a ceiling the team cannot cross, so it is drawn heavier
+          than the thresholds it may pass through. */}
+      {hardCap?.ceiling ? (
+        <span
+          className="absolute -inset-y-0.5 w-0.5 rounded bg-red-500"
+          style={{ left: `${(hardCap.ceiling / scale) * 100}%` }}
+          title={`Hard cap ${money(hardCap.ceiling)}`}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Rule 4.7 — the ceiling, the room left under it, and the move that bought it.
+ *
+ * The reserve is spelled out rather than folded into one figure: a team that
+ * looks to have room and is refused anyway is the question this answers
+ * (Rule 4.8).
+ */
+function HardCapNote({ hardCap }: { hardCap: TeamHardCap }) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
+        Hard cap · {hardCap.apronLabel}
+      </p>
+      <p
+        className={`mt-1 text-xs font-medium ${
+          hardCap.pass ? "text-brand-dark" : "text-red-600"
+        }`}
+      >
+        {hardCap.message}
+      </p>
+      {hardCap.triggerLabel ? (
+        <p className="mt-1 text-[11px] text-brand-muted">
+          {hardCap.triggerLabel}
+        </p>
+      ) : null}
+      <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-brand-muted">
+        <div className="flex gap-1">
+          <dt className="font-semibold">Ceiling</dt>
+          <dd>{hardCap.ceiling === null ? "—" : money(hardCap.ceiling)}</dd>
+        </div>
+        <div className="flex gap-1">
+          <dt className="font-semibold">Team salary</dt>
+          <dd>{money(hardCap.teamSalary)}</dd>
+        </div>
+        <div className="flex gap-1">
+          <dt className="font-semibold">Roster reserve</dt>
+          <dd>
+            {money(hardCap.reserve)}
+            {hardCap.openSpots > 0
+              ? ` · ${hardCap.openSpots} spot${hardCap.openSpots === 1 ? "" : "s"} at ${money(hardCap.rookieMinimum)}`
+              : ""}
+          </dd>
+        </div>
+        <div className="flex gap-1">
+          <dt className="font-semibold">Roster</dt>
+          <dd>
+            {hardCap.rosterCount} of {hardCap.rosterMinimum} minimum
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * A team's Traded Player Exceptions (Rule 7.6).
+ *
+ * Read-only: an exception is created and spent by the trade engine, and
+ * nothing in Article 7 lets a commissioner write one by hand.
+ */
+function ExceptionList({
+  exceptions,
+}: {
+  exceptions: TradeExceptionRow[];
+}) {
+  return (
+    <div className="border-t border-brand-border px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
+        Trade exceptions ·{" "}
+        {money(exceptions.reduce((sum, row) => sum + row.remaining, 0))}{" "}
+        remaining
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {exceptions.map((row) => (
+          <li key={row.id} className="flex items-center justify-between text-xs">
+            <span className="text-brand-dark">
+              {row.label}
+              <span className="ml-1.5 text-brand-muted">
+                expires {formatExpiry(row.expiresAt)}
+              </span>
+            </span>
+            <span className="text-brand-muted">
+              {money(row.remaining)}
+              {row.remaining !== row.amount ? ` of ${money(row.amount)}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -104,13 +227,27 @@ function ContractRow({ contract }: { contract: SalaryContract }) {
   );
 }
 
-function TeamPanel({ team, cap }: { team: SalaryTeam; cap: SalaryCap }) {
+function TeamPanel({
+  team,
+  cap,
+  hardCap,
+  exceptions,
+}: {
+  team: SalaryTeam;
+  cap: SalaryCap;
+  hardCap?: TeamHardCap;
+  exceptions: TradeExceptionRow[];
+}) {
   const [open, setOpen] = useState(false);
+
+  const capped = hardCap?.apron ? hardCap : undefined;
 
   const hasDetail =
     team.contracts.length > 0 ||
     team.deadMoneyRows.length > 0 ||
-    team.capHoldRows.length > 0;
+    team.capHoldRows.length > 0 ||
+    exceptions.length > 0 ||
+    capped !== undefined;
 
   return (
     <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
@@ -176,13 +313,32 @@ function TeamPanel({ team, cap }: { team: SalaryTeam; cap: SalaryCap }) {
             >
               {TIER_LABEL[team.tier]}
             </span>
+            {capped ? (
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  capped.pass
+                    ? "bg-red-50 text-red-600"
+                    : "bg-red-600 text-white"
+                }`}
+                title={capped.message}
+              >
+                Hard cap · {capped.apronLabel}
+                {capped.room === null
+                  ? ""
+                  : capped.pass
+                    ? ` · ${short(capped.room)} room`
+                    : ` · ${short(capped.shortfall)} over`}
+              </span>
+            ) : null}
           </div>
         </div>
-        <CapBar team={team} cap={cap} />
+        <CapBar team={team} cap={cap} hardCap={capped} />
       </button>
 
       {open ? (
         <div className="border-t border-brand-border">
+          {capped ? <HardCapNote hardCap={capped} /> : null}
+
           {team.contracts.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[480px] text-sm">
@@ -256,6 +412,10 @@ function TeamPanel({ team, cap }: { team: SalaryTeam; cap: SalaryCap }) {
               </ul>
             </div>
           ) : null}
+
+          {exceptions.length > 0 ? (
+            <ExceptionList exceptions={exceptions} />
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -271,7 +431,39 @@ export default function SalaryManagementPage() {
     { skip: !leagueId },
   );
 
+  const { data: hardCaps } = useLeagueHardCapsQuery(
+    { leagueId: leagueId as number },
+    { skip: !leagueId },
+  );
+
+  const { data: exceptions = [] } = useTradeExceptionsQuery(
+    { leagueId: leagueId as number },
+    { skip: !leagueId },
+  );
+
   const [term, setTerm] = useState("");
+
+  const hardCapByTeamId = useMemo(
+    () => new Map((hardCaps?.teams ?? []).map((row) => [row.team.id, row])),
+    [hardCaps],
+  );
+
+  const exceptionsByTeamId = useMemo(() => {
+    const map = new Map<number, TradeExceptionRow[]>();
+    for (const row of exceptions) {
+      const list = map.get(row.team.id);
+      if (list) list.push(row);
+      else map.set(row.team.id, [row]);
+    }
+    return map;
+  }, [exceptions]);
+
+  // Rule 4.1 — a hard cap binds absolutely, so a team that has one is worth
+  // saying out loud rather than leaving folded inside a panel.
+  const cappedTeams = useMemo(
+    () => (hardCaps?.teams ?? []).filter((row) => row.apron !== null),
+    [hardCaps],
+  );
 
   const teams = useMemo(() => {
     const all = data?.teams ?? [];
@@ -353,6 +545,23 @@ export default function SalaryManagementPage() {
         </div>
       ) : null}
 
+      {cappedTeams.length > 0 ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <span className="font-semibold">
+            {cappedTeams.length} team{cappedTeams.length === 1 ? "" : "s"}{" "}
+            hard-capped this league year.
+          </span>{" "}
+          {cappedTeams
+            .map(
+              (row) =>
+                `${row.team.abbr} (${row.apronLabel}${
+                  row.pass ? "" : ", over"
+                })`,
+            )
+            .join(" · ")}
+        </div>
+      ) : null}
+
       {isLoading ? <p className="text-sm text-brand-muted">Loading…</p> : null}
 
       {!isLoading && !anyContracts ? (
@@ -370,7 +579,13 @@ export default function SalaryManagementPage() {
       <div className="space-y-3">
         {cap
           ? teams.map((team) => (
-              <TeamPanel key={team.id} team={team} cap={cap} />
+              <TeamPanel
+                key={team.id}
+                team={team}
+                cap={cap}
+                hardCap={hardCapByTeamId.get(team.id)}
+                exceptions={exceptionsByTeamId.get(team.id) ?? []}
+              />
             ))
           : null}
       </div>

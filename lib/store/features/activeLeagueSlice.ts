@@ -16,14 +16,15 @@ type ActiveLeagueState = {
   current: ActiveLeague | null;
 };
 
-const initialState: ActiveLeagueState = { current: null };
+// Exported for the same reason as the auth slice: the store merges onto it.
+export const activeLeagueInitialState: ActiveLeagueState = { current: null };
 
 // Every league office page needs to know which league it is looking at. The
 // id is kept here instead of in each URL, because fifteen pages would
 // otherwise have to carry the same query param.
 const activeLeagueSlice = createSlice({
   name: "activeLeague",
-  initialState,
+  initialState: activeLeagueInitialState,
   reducers: {
     setActiveLeague(state, action: PayloadAction<ActiveLeague>) {
       state.current = action.payload;
@@ -34,7 +35,7 @@ const activeLeagueSlice = createSlice({
   },
   extraReducers: (builder) => {
     // Signing out must not leave the next user inside the previous league.
-    builder.addCase('auth/logout', () => initialState);
+    builder.addCase('auth/logout', () => activeLeagueInitialState);
   },
 });
 

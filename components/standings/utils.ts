@@ -1,4 +1,4 @@
-import type { StandingRow } from "@/lib/store/features/leagueSlice";
+import type { StandingRow } from "@/lib/store/api/endpoints/standingsApi";
 
 export function pct(row: StandingRow) {
   const games = row.w + row.l;

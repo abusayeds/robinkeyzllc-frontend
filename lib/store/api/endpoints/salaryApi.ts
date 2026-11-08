@@ -159,6 +159,58 @@ export const salaryApi = baseApi.injectEndpoints({
 
 export const { useLeagueSalariesQuery } = salaryApi;
 
+/** Article 4 — the two ceilings a move can buy. */
+export type HardCapApron = "firstApron" | "secondApron";
+
+/**
+ * Rule 4.7 — what a hard-capped team is owed on screen: the ceiling, the room
+ * left under it, and which move bought it.
+ *
+ * `apron` is null for most teams most of the time, which is the whole point of
+ * Article 4: a hard cap is earned, not a tier every team sits in.
+ */
+export type TeamHardCap = {
+  team: { id: number; name: string; abbr: string; logo: string | null };
+  teamSalary: number;
+  apron: HardCapApron | null;
+  apronLabel: string | null;
+  ceiling: number | null;
+  /** Rule 4.8 — spots still to fill before the league's roster minimum. */
+  openSpots: number;
+  reserve: number;
+  committed: number;
+  room: number | null;
+  pass: boolean;
+  shortfall: number;
+  message: string;
+  trigger: string | null;
+  triggerLabel: string | null;
+  rosterCount: number;
+  rosterMinimum: number;
+  rookieMinimum: number;
+};
+
+export type LeagueHardCaps = {
+  seasonStartYear: number;
+  teams: TeamHardCap[];
+};
+
+export const hardCapApi = baseApi.injectEndpoints({
+  endpoints: (builder) => ({
+    leagueHardCaps: builder.query<LeagueHardCaps, { leagueId: number }>({
+      query: ({ leagueId }) => `/leagues/${leagueId}/cap/hard-caps`,
+      transformResponse: (r: ApiResponse<LeagueHardCaps>) => unwrap(r),
+      // A processed trade is what creates one, and trades already invalidate
+      // Salaries, so no extra tag has to be minted for this.
+      providesTags: (_result, _error, { leagueId }) => [
+        { type: "Salaries" as const, id: leagueId },
+      ],
+    }),
+  }),
+});
+
+export const { useLeagueHardCapsQuery } = hardCapApi;
+
 export type OutlookSeason = {
   seasonStartYear: number;
   payroll: number;

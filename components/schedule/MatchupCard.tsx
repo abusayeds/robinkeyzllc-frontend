@@ -1,7 +1,7 @@
 import type {
-  LeagueTeam,
+  MatchupTeam,
   ScheduleMatchup,
-} from "@/lib/store/features/leagueSlice";
+} from "@/lib/store/api/endpoints/standingsApi";
 import TeamLogo from "@/components/ui/TeamLogo";
 import {
   centerLabel,
@@ -15,7 +15,7 @@ function TeamBlock({
   team,
   align,
 }: {
-  team?: LeagueTeam;
+  team?: MatchupTeam;
   align: "left" | "right";
 }) {
   return (
@@ -49,9 +49,9 @@ export default function MatchupCard({
   onSelect,
 }: {
   matchup: ScheduleMatchup;
-  home?: LeagueTeam;
-  away?: LeagueTeam;
-  perspectiveId?: string;
+  home?: MatchupTeam;
+  away?: MatchupTeam;
+  perspectiveId?: number | null;
   onSelect: (matchup: ScheduleMatchup) => void;
 }) {
   const status = statusMeta(matchup.status);

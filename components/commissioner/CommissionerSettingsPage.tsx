@@ -36,8 +36,14 @@ import {
 const SETUP_MODES: LeagueSetupMode[] = ["startup", "import"];
 const FA_STYLES: FreeAgencyStyle[] = ["dynamic", "auction"];
 
+// The trading rules that are switches. `pickTradingWindowDrafts` is a
+// number and gets its own row, so it has to be kept out of this list.
+type TradingToggle = {
+  [K in keyof TradingRules]: TradingRules[K] extends boolean ? K : never;
+}[keyof TradingRules];
+
 const TRADING_RULES: {
-  key: keyof TradingRules;
+  key: TradingToggle;
   label: string;
   hint: string;
 }[] = [
@@ -431,7 +437,7 @@ export default function CommissionerSettingsPage() {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
-  const setTrading = (key: keyof TradingRules, value: boolean) =>
+  const setTrading = (key: TradingToggle, value: boolean) =>
     setForm((f) =>
       f ? { ...f, trading: { ...f.trading, [key]: value } } : f,
     );
@@ -484,6 +490,13 @@ export default function CommissionerSettingsPage() {
       if (form.trading[rule.key] !== saved.trading[rule.key]) {
         settingsPatch[rule.key] = form.trading[rule.key];
       }
+    }
+    if (
+      form.trading.pickTradingWindowDrafts !==
+      saved.trading.pickTradingWindowDrafts
+    ) {
+      settingsPatch.pickTradingWindowDrafts =
+        form.trading.pickTradingWindowDrafts;
     }
 
     try {
@@ -711,6 +724,39 @@ export default function CommissionerSettingsPage() {
             }
           />
         ))}
+        <Row
+          label="Pick Trading Window"
+          hint="How many drafts ahead a pick may be traded. The rule book's own number is 7."
+          control={
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={form.trading.pickTradingWindowDrafts}
+                disabled={!canEdit || !form.trading.allowDraftPickTrading}
+                onChange={(e) =>
+                  setForm((f) =>
+                    f
+                      ? {
+                          ...f,
+                          trading: {
+                            ...f.trading,
+                            pickTradingWindowDrafts: Math.min(
+                              10,
+                              Math.max(1, Number(e.target.value) || 1),
+                            ),
+                          },
+                        }
+                      : f,
+                  )
+                }
+                className="w-20 rounded-lg border border-brand-border px-3 py-1.5 text-sm text-brand-dark outline-none focus:border-brand-cta disabled:bg-brand-soft disabled:text-brand-muted"
+              />
+              <span className="text-xs text-brand-muted">drafts</span>
+            </div>
+          }
+        />
         <Row
           label="Free Agency Style"
           hint="Choose how free agents are acquired by teams."

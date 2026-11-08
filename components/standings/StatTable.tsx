@@ -1,8 +1,10 @@
-import type { StatCategories } from "@/lib/store/features/leagueSlice";
+import TeamLogo from "@/components/ui/TeamLogo";
+import type { StatCategories } from "@/lib/store/api/endpoints/standingsApi";
 
 export type StatRow = {
-  id: string;
+  id: number;
   team: string;
+  logo: string | null;
   yourTeam?: boolean;
   primary: number;
   stats: StatCategories;
@@ -85,9 +87,12 @@ export default function StatTable({
               <td className={`${td} w-10 text-brand-muted`}>{index + 1}</td>
               <td className={td}>
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-forest text-[11px] font-bold text-brand-accent">
-                    {row.team.charAt(0)}
-                  </span>
+                  <TeamLogo
+                    name={row.team}
+                    src={row.logo}
+                    className="h-7 w-7 text-[11px]"
+                    rounded="rounded-md"
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-brand-dark">
                       {row.team}
