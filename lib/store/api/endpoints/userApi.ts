@@ -16,8 +16,7 @@ export const userApi = baseApi.injectEndpoints({
       { name: string; email: string; password: string; phone?: string }
     >({
       query: (body) => ({ url: "/users/register", method: "POST", body }),
-      transformResponse: (response: ApiResponse<TokenOnly>) =>
-        unwrap(response),
+      transformResponse: (response: ApiResponse<TokenOnly>) => unwrap(response),
     }),
 
     verifyEmailOtp: builder.mutation<AuthUser, { otp: string; token: string }>({

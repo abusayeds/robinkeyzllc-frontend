@@ -110,7 +110,11 @@ export const playerImportApi = baseApi.injectEndpoints({
       query: ({ leagueId, file }) => {
         const body = new FormData();
         body.append("file", file);
-        return { url: `/leagues/${leagueId}/import/preview`, method: "POST", body };
+        return {
+          url: `/leagues/${leagueId}/import/preview`,
+          method: "POST",
+          body,
+        };
       },
       transformResponse: (r: ApiResponse<ImportPreview>) => unwrap(r),
       invalidatesTags: (_result, _error, { leagueId }) => [

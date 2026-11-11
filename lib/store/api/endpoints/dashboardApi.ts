@@ -1,9 +1,14 @@
 import { baseApi, unwrap } from "../baseApi";
 import type { ApiResponse } from "../types";
 import type { CalendarPhase } from "./calendarApi";
+import type { TransactionItem } from "./transactionsApi";
 import type { HardCapApron, Tier } from "./salaryApi";
 
-export type TeamHolder = { id: number; name: string; image: string | null } | null;
+export type TeamHolder = {
+  id: number;
+  name: string;
+  image: string | null;
+} | null;
 
 /** How loudly an item asks to be dealt with. */
 export type AttentionSeverity = "action" | "warning" | "info";
@@ -30,13 +35,11 @@ export type DashboardEvent = {
   isLive: boolean;
 };
 
-export type ActivityItem = {
-  id: string;
-  kind: "trade" | "signing" | "pick";
-  at: string;
-  title: string;
-  detail: string;
-};
+/**
+ * The activity card is the Transactions feed narrowed to this team, so one
+ * trade cannot be described two different ways on two screens.
+ */
+export type ActivityItem = TransactionItem;
 
 export type DraftAssetYear = {
   seasonStartYear: number;

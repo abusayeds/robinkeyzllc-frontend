@@ -47,6 +47,8 @@ export default function TransactionsPage() {
       list = list.filter((t) => t.category === "Signings");
     else if (tab === "Waivers")
       list = list.filter((t) => t.category === "Waivers");
+    else if (tab === "Draft Picks")
+      list = list.filter((t) => t.category === "Draft");
     if (mineOnly) list = list.filter((t) => t.mine);
     return list;
   }, [recent, tab, mineOnly]);
@@ -78,8 +80,8 @@ export default function TransactionsPage() {
       <div>
         <h1 className="text-xl font-bold text-brand-dark">Transactions</h1>
         <p className="text-sm text-brand-muted">
-          Recent trades, signings, waivers, and draft pick movement across the
-          league.
+          Recent trades, signings, waivers, draft selections and pick movement
+          across the league.
         </p>
       </div>
 
@@ -126,8 +128,26 @@ export default function TransactionsPage() {
         )}
       </div>
 
+      {/* One tab, both halves of the same question: the picks this team has
+          spent, and the ones it still holds. */}
       {tab === "Draft Picks" ? (
-        <DraftPicksTable picks={myPicks} lastSynced={lastSynced} />
+        <div className="space-y-5">
+          {items.length > 0 ? (
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-brand-dark">
+                Selections made
+              </h2>
+              <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
+                <div className="divide-y divide-brand-border">
+                  {items.map((item) => (
+                    <TransactionRow key={item.id} item={item} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <DraftPicksTable picks={myPicks} lastSynced={lastSynced} />
+        </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
           {isLoading ? (

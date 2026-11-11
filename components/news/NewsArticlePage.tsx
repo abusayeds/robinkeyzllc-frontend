@@ -3,12 +3,23 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
+import { useLeagueNewsQuery } from "@/lib/store/api/endpoints/newsApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import { CATEGORY_STYLE } from "./category";
 
 export default function NewsArticlePage() {
   const params = useParams<{ id: string }>();
-  const articles = useAppSelector((state) => state.news.articles);
+  const activeLeague = useAppSelector((s) => s.activeLeague.current);
+  const leagueId = activeLeague?.id;
+
+  // The feed is one request and the article is a row in it, so there is no
+  // per-article endpoint to add: an item is derived from a move, an injury
+  // or a date, not stored as a document.
+  const { data, isLoading } = useLeagueNewsQuery(
+    { leagueId: leagueId as number },
+    { skip: !leagueId },
+  );
+  const articles = data?.articles ?? [];
 
   const index = articles.findIndex((a) => a.id === params.id);
   const article = articles[index];
@@ -17,7 +28,9 @@ export default function NewsArticlePage() {
   if (!article) {
     return (
       <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
-        <p className="text-sm text-brand-muted">Article not found.</p>
+        <p className="text-sm text-brand-muted">
+          {isLoading ? "Loading…" : "Article not found."}
+        </p>
         <Link
           href="/league/news"
           className="mt-3 inline-block text-sm font-semibold text-brand-cta-dark"

@@ -1,6 +1,9 @@
 "use client";
 
-import type { RosterPlayer, RosterRules } from "@/lib/store/api/endpoints/rosterApi";
+import type {
+  RosterPlayer,
+  RosterRules,
+} from "@/lib/store/api/endpoints/rosterApi";
 
 /**
  * How the roster sits against the league's own slot layout.
@@ -47,7 +50,8 @@ export default function RosterComposition({
         {rows.map((row) => {
           const over = row.used > row.limit;
           const under = row.min !== undefined && row.used < row.min;
-          const width = row.limit > 0 ? Math.min(100, (row.used / row.limit) * 100) : 0;
+          const width =
+            row.limit > 0 ? Math.min(100, (row.used / row.limit) * 100) : 0;
 
           return (
             <div key={row.label}>

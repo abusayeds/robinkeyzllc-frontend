@@ -1,4 +1,4 @@
-import type { NewsCategory } from "@/lib/store/features/newsSlice";
+import type { NewsCategory } from "@/lib/store/api/endpoints/newsApi";
 
 type Style = { badge: string; border: string; label: string };
 
@@ -18,11 +18,7 @@ export const CATEGORY_STYLE: Record<NewsCategory, Style> = {
     border: "border-l-amber-500",
     label: "Waiver",
   },
-  Extension: {
-    badge: "bg-brand-cta/15 text-brand-cta-dark",
-    border: "border-l-brand-cta",
-    label: "Extension",
-  },
+
   Injury: {
     badge: "bg-red-100 text-red-700",
     border: "border-l-red-500",
@@ -43,25 +39,22 @@ export const CATEGORY_STYLE: Record<NewsCategory, Style> = {
     border: "border-l-brand-border",
     label: "League Update",
   },
-  Rumor: {
-    badge: "bg-amber-100 text-amber-700",
-    border: "border-l-amber-400",
-    label: "Rumor",
-  },
+
 };
 
+// One tab per category that has a source behind it. Extensions, Salary
+// Cap and Rumors were in this list with nothing to fill them: AVORA has
+// no extension event, no rumour mill, and a cap change is a setting
+// rather than something that happens.
 export const FILTER_TABS = [
   "All News",
   "Trades",
   "Signings",
   "Waivers",
-  "Extensions",
   "Draft",
   "Injuries",
   "League Updates",
   "Commissioner",
-  "Salary Cap",
-  "Rumors",
 ] as const;
 
 export function categoryMatchesFilter(cat: NewsCategory, filter: string) {
@@ -70,12 +63,10 @@ export function categoryMatchesFilter(cat: NewsCategory, filter: string) {
     Trades: "Trade",
     Signings: "Signing",
     Waivers: "Waiver",
-    Extensions: "Extension",
     Draft: "Draft",
     Injuries: "Injury",
     "League Updates": "League Update",
     Commissioner: "Commissioner",
-    Rumors: "Rumor",
   };
   return map[filter] === cat;
 }

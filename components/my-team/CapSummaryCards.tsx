@@ -5,7 +5,8 @@ import type { RosterRules } from "@/lib/store/api/endpoints/rosterApi";
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
@@ -89,7 +90,9 @@ export default function CapSummaryCards({
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-muted">
             {card.label}
           </p>
-          <p className={`mt-1 text-xl font-bold ${card.tone ?? "text-brand-dark"}`}>
+          <p
+            className={`mt-1 text-xl font-bold ${card.tone ?? "text-brand-dark"}`}
+          >
             {card.value}
           </p>
           <p className="text-[11px] text-brand-muted">{card.sub}</p>

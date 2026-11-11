@@ -6,15 +6,7 @@ import type { ApiResponse } from "../types";
  * the standings screen shows: FG%, FT%, 3PTM, PTS, REB, AST, STL, BLK, TO.
  */
 export type CategoryKey =
-  | "fgPct"
-  | "ftPct"
-  | "threes"
-  | "pts"
-  | "reb"
-  | "ast"
-  | "stl"
-  | "blk"
-  | "to";
+  "fgPct" | "ftPct" | "threes" | "pts" | "reb" | "ast" | "stl" | "blk" | "to";
 
 export type StatCategories = Record<CategoryKey, number>;
 
@@ -174,10 +166,7 @@ export const standingsApi = baseApi.injectEndpoints({
       ],
     }),
 
-    settleWeeks: builder.mutation<
-      { settled: number[] },
-      { leagueId: number }
-    >({
+    settleWeeks: builder.mutation<{ settled: number[] }, { leagueId: number }>({
       query: ({ leagueId }) => ({
         url: `/leagues/${leagueId}/schedule/settle`,
         method: "POST",

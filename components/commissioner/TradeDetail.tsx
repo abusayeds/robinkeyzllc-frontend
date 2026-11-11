@@ -105,18 +105,32 @@ export default function TradeDetail({
                   <span className="font-medium">
                     {asset.player
                       ? asset.player.name
-                      : (asset.exception?.label ?? "Exception")}
+                      : (asset.pick?.label ??
+                        asset.exception?.label ??
+                        "Exception")}
                   </span>
                   {asset.player?.position ? (
                     <span className="text-[11px] text-brand-muted">
                       {asset.player.position}
                     </span>
                   ) : null}
+                  {/* Rule 12.10 — a pick's terms travel with it, so the team
+                      it was born to and its protection are named here. */}
+                  {asset.pick ? (
+                    <span className="text-[11px] text-brand-muted">
+                      via {asset.pick.originalTeam.abbr}
+                      {asset.pick.protectedTopN !== null
+                        ? ` · top-${asset.pick.protectedTopN} protected`
+                        : ""}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="text-brand-muted">
                   {asset.kind === "tradeException"
                     ? money(asset.exception?.remaining ?? 0)
-                    : money(asset.salary)}
+                    : asset.kind === "draftPick"
+                      ? "pick"
+                      : money(asset.salary)}
                 </span>
               </li>
             ))}

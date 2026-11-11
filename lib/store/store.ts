@@ -4,20 +4,12 @@ import { configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { baseApi } from "./api/baseApi";
 import uiReducer from "./features/uiSlice";
-import leagueReducer from "./features/leagueSlice";
-import teamReducer from "./features/teamSlice";
-import transactionsReducer from "./features/transactionsSlice";
-import rostersReducer from "./features/rostersSlice";
-import tradeReducer from "./features/tradeSlice";
-import freeAgencyReducer from "./features/freeAgencySlice";
-import draftReducer from "./features/draftSlice";
-import newsReducer from "./features/newsSlice";
+
 import authReducer, { authInitialState } from "./features/authSlice";
 import activeLeagueReducer, {
   activeLeagueInitialState,
 } from "./features/activeLeagueSlice";
-import draftPicksReducer from "./features/draftPicksSlice";
-import settingsReducer from "./features/settingsSlice";
+
 import platformReducer, {
   platformInitialState,
   type AdminViewingLeague,
@@ -77,18 +69,10 @@ export const makeStore = () => {
   const store = configureStore({
     reducer: {
       ui: uiReducer,
-      league: leagueReducer,
-      team: teamReducer,
-      transactions: transactionsReducer,
-      rosters: rostersReducer,
-      trade: tradeReducer,
-      freeAgency: freeAgencyReducer,
-      draft: draftReducer,
-      news: newsReducer,
+
       auth: authReducer,
       activeLeague: activeLeagueReducer,
-      draftPicks: draftPicksReducer,
-      settings: settingsReducer,
+
       platform: platformReducer,
       [baseApi.reducerPath]: baseApi.reducer,
     },

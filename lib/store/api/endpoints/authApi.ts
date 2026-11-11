@@ -1,10 +1,5 @@
 import { baseApi, unwrap } from "../baseApi";
-import type {
-  ApiResponse,
-  AuthUser,
-  LoginResult,
-  TokenOnly,
-} from "../types";
+import type { ApiResponse, AuthUser, LoginResult, TokenOnly } from "../types";
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -30,8 +25,7 @@ export const authApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      transformResponse: (response: ApiResponse<TokenOnly>) =>
-        unwrap(response),
+      transformResponse: (response: ApiResponse<TokenOnly>) => unwrap(response),
     }),
 
     // The otp token is passed in explicitly: it is a short-lived flow token,
@@ -46,8 +40,7 @@ export const authApi = baseApi.injectEndpoints({
         body: { otp },
         headers: { Authorization: `Bearer ${token}` },
       }),
-      transformResponse: (response: ApiResponse<TokenOnly>) =>
-        unwrap(response),
+      transformResponse: (response: ApiResponse<TokenOnly>) => unwrap(response),
     }),
 
     resendForgetOtp: builder.mutation<unknown, { token: string }>({

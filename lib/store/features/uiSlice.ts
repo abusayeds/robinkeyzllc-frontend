@@ -4,7 +4,7 @@ type UiState = {
   sidebarOpen: boolean;
   pageTitle: string;
   /** Team currently being viewed on the Contracts / Draft Picks tabs; null = your own team. */
-  contractsViewTeamId: string | null;
+  contractsViewTeamId: number | null;
 };
 
 const initialState: UiState = {
@@ -26,7 +26,7 @@ const uiSlice = createSlice({
     setPageTitle(state, action: PayloadAction<string>) {
       state.pageTitle = action.payload;
     },
-    setContractsViewTeamId(state, action: PayloadAction<string | null>) {
+    setContractsViewTeamId(state, action: PayloadAction<number | null>) {
       state.contractsViewTeamId = action.payload;
     },
   },

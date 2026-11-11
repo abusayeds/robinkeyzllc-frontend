@@ -6,10 +6,15 @@ export type TransactionType =
   | "Player Signed"
   | "Free Agent Signed"
   | "Player Waived"
+  | "Player Drafted"
   | "Draft Pick Traded";
 
 /** The page's tabs group the types; a type belongs to exactly one. */
-export type TransactionCategory = "Trades" | "Signings" | "Waivers";
+export type TransactionCategory =
+  | "Trades"
+  | "Signings"
+  | "Waivers"
+  | "Draft";
 
 export type TransactionItem = {
   id: string;

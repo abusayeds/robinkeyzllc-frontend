@@ -17,6 +17,8 @@ const CONTRACT_TYPES = [
   { value: "rookieScale", label: "Rookie Scale" },
   { value: "supermax", label: "Supermax" },
   { value: "twoWay", label: "Two-Way" },
+  { value: "nonGuaranteed", label: "Non-Guaranteed" },
+  { value: "partiallyGuaranteed", label: "Partially Guaranteed" },
 ];
 
 const SIGNED_VIA = [
@@ -55,6 +57,9 @@ export default function OfferSheetModal({
   const [raisePct, setRaisePct] = useState(0);
   const [contractType, setContractType] = useState("standard");
   const [signedVia, setSignedVia] = useState("capSpace");
+  // Rule 10.1 — what each season is guaranteed for, by season index. Only read
+  // for a partially guaranteed offer; the other types say it by their name.
+  const [guarantees, setGuarantees] = useState<number[]>([]);
 
   // Reset whenever a different player is opened, and start from the offer this
   // team already has on him rather than from nothing.
@@ -67,6 +72,7 @@ export default function OfferSheetModal({
     setRaisePct(existing?.raisePct ?? 0);
     setContractType(existing?.contractType ?? "standard");
     setSignedVia(existing?.signedVia ?? "capSpace");
+    setGuarantees(existing?.guaranteedAmounts ?? []);
   }, [player, existing, team]);
 
   useEffect(() => {
@@ -80,6 +86,7 @@ export default function OfferSheetModal({
   }, [onClose]);
 
   const isTwoWay = contractType === "twoWay";
+  const isPartial = contractType === "partiallyGuaranteed";
 
   const rows = useMemo(
     () =>
@@ -298,6 +305,51 @@ export default function OfferSheetModal({
             </table>
           </div>
 
+          {/* Rule 10.1 — a partial guarantee is named season by season, so
+              the inputs sit beside the salaries they are capped by. */}
+          {isPartial ? (
+            <div className="rounded-lg border border-brand-border p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
+                Guaranteed per season
+              </p>
+              <p className="mt-1 text-xs text-brand-muted">
+                What the team still owes him for that season if he is waived
+                (Rule 10.14). Leave a season at zero to guarantee nothing.
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {rows.map((row, index) => (
+                  <label key={row.seasonStartYear} className="block">
+                    <span className="text-xs text-brand-muted">
+                      {seasonLabel(row.seasonStartYear)} · of {money(row.salary)}
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={row.salary}
+                      step={100000}
+                      value={guarantees[index] ?? 0}
+                      onChange={(e) =>
+                        setGuarantees((current) => {
+                          // Sized to the salary rows, so changing the number
+                          // of years cannot leave a stale season behind.
+                          const next = rows.map(
+                            (_, slot) => current[slot] ?? 0,
+                          );
+                          next[index] = Math.max(
+                            0,
+                            Math.min(row.salary, Number(e.target.value) || 0),
+                          );
+                          return next;
+                        })
+                      }
+                      className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-cta"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {warnings.length > 0 ? (
             <ul className="space-y-1 rounded-lg bg-amber-50 px-3 py-2">
               {warnings.map((warning) => (
@@ -343,6 +395,11 @@ export default function OfferSheetModal({
                   raisePct: isTwoWay ? 0 : raisePct,
                   contractType,
                   signedVia: isTwoWay ? "capSpace" : signedVia,
+                  // Sent only when the type asks for it, and always one figure
+                  // per season so the server's length check reads true.
+                  guaranteedAmounts: isPartial
+                    ? rows.map((_, index) => guarantees[index] ?? 0)
+                    : undefined,
                 })
               }
               className="rounded-lg bg-brand-cta px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-cta-dark disabled:cursor-not-allowed disabled:opacity-50"

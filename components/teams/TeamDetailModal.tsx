@@ -2,28 +2,56 @@
 
 import { useEffect } from "react";
 import { FiX } from "react-icons/fi";
-import type { LeagueTeam } from "@/lib/store/features/leagueSlice";
-import TeamLogo from "@/components/ui/TeamLogo";
-import { capStatusTone, money, moneyTone, ordinal } from "./utils";
 
-const rows = (team: LeagueTeam) => [
+import TeamLogo from "@/components/ui/TeamLogo";
+import Link from "next/link";
+import {
+  capStatusTone,
+  money,
+  moneyTone,
+  ordinal,
+  type LeagueTeamRow,
+} from "./utils";
+
+/**
+ * Room left under each of Article 3's thresholds.
+ *
+ * Room rather than the threshold itself: the lines are league-wide, so
+ * printing them would put the same four numbers on all twelve cards.
+ */
+const rows = (team: LeagueTeamRow) => [
   { label: "Roster", value: `${team.rosterCount}/${team.rosterMax}` },
-  { label: "League Rank", value: ordinal(team.leagueRank) },
+  {
+    label: "League Rank",
+    value: team.leagueRank > 0 ? ordinal(team.leagueRank) : "—",
+  },
   {
     label: "Cap Space",
     value: money(team.capSpace),
     valueClass: moneyTone(team.capSpace),
   },
-  { label: "Luxury Tax", value: money(team.luxuryTax) },
-  { label: "1st Apron", value: money(team.firstApron) },
-  { label: "Cap Room", value: money(team.capRoom) },
+  {
+    label: "Luxury Tax",
+    value: money(team.taxRoom),
+    valueClass: moneyTone(team.taxRoom),
+  },
+  {
+    label: "1st Apron",
+    value: money(team.firstApronRoom),
+    valueClass: moneyTone(team.firstApronRoom),
+  },
+  {
+    label: "Cap Room",
+    value: money(team.secondApronRoom),
+    valueClass: moneyTone(team.secondApronRoom),
+  },
 ];
 
 export default function TeamDetailModal({
   team,
   onClose,
 }: {
-  team: LeagueTeam | null;
+  team: LeagueTeamRow | null;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -68,7 +96,7 @@ export default function TeamDetailModal({
                 <h2 className="text-base font-bold text-brand-dark">
                   {team.name}
                 </h2>
-                {team.yourTeam ? (
+                {team.isMine ? (
                   <span className="rounded-full bg-brand-cta/15 px-2 py-0.5 text-[10px] font-bold text-brand-cta-dark">
                     Your Team
                   </span>
@@ -96,10 +124,10 @@ export default function TeamDetailModal({
             </span>
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${capStatusTone(
-                team.capStatus
+                team.tier,
               )}`}
             >
-              {team.capStatus}
+              {team.tierLabel}
             </span>
           </div>
 
@@ -123,24 +151,24 @@ export default function TeamDetailModal({
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-brand-border px-5 py-4">
-          <button
-            type="button"
-            className="flex-1 rounded-lg border border-brand-border px-3 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-soft"
+          <Link
+            href="/my-team/contracts"
+            className="flex-1 rounded-lg border border-brand-border px-3 py-2 text-center text-sm font-semibold text-brand-dark transition hover:bg-brand-soft"
           >
             View Roster
-          </button>
-          <button
-            type="button"
-            className="flex-1 rounded-lg bg-brand-forest px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+          </Link>
+          <Link
+            href="/league/trade-finder"
+            className="flex-1 rounded-lg bg-brand-forest px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-brand-dark"
           >
             Trade Block
-          </button>
-          <button
-            type="button"
-            className="flex-1 rounded-lg bg-brand-cta px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-cta-dark"
+          </Link>
+          <Link
+            href="/my-team/trade-center"
+            className="flex-1 rounded-lg bg-brand-cta px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-brand-cta-dark"
           >
             Send Offer
-          </button>
+          </Link>
         </div>
       </div>
     </div>

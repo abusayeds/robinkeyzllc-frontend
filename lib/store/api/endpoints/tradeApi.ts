@@ -12,7 +12,7 @@ export type TradeStatus =
   | "processed";
 
 export type TradeResponse = "pending" | "accepted" | "declined";
-export type TradeAssetKind = "player" | "tradeException";
+export type TradeAssetKind = "player" | "tradeException" | "draftPick";
 
 export const TRADE_STATUS_LABEL: Record<TradeStatus, string> = {
   proposed: "Awaiting replies",
@@ -46,7 +46,13 @@ export type TradeCheck = {
 
 export type TradeTeamImpact = {
   teamId: number;
-  team: { id: number; name: string; abbr: string; color: string; logo: string | null };
+  team: {
+    id: number;
+    name: string;
+    abbr: string;
+    color: string;
+    logo: string | null;
+  };
   response: TradeResponse;
   respondedAt: string | null;
   respondedBy: { id: number; name: string } | null;
@@ -70,6 +76,16 @@ export type TradeAsset = {
     position: string | null;
   } | null;
   exception: { id: number; label: string; remaining: number } | null;
+  /** Article 12 — a future pick is an asset in its own right here. */
+  pick: {
+    id: number;
+    seasonStartYear: number;
+    round: number;
+    /** "2028 1st", built on the server so both sides read it the same way. */
+    label: string;
+    protectedTopN: number | null;
+    originalTeam: { id: number; abbr: string };
+  } | null;
 };
 
 export type Trade = {
@@ -105,18 +121,18 @@ export type ProposeTradeInput = {
     toTeamId: number;
     leaguePlayerId?: number;
     tradeExceptionId?: number;
+    draftPickId?: number;
   }[];
   message?: string;
 };
 
 /** Everything a processed trade touches, so its tags can be written once. */
-const SETTLED_TAGS = (leagueId: number) =>
-  [
-    { type: "Trades" as const, id: leagueId },
-    { type: "Rosters" as const, id: leagueId },
-    { type: "Salaries" as const, id: leagueId },
-    { type: "Overview" as const, id: leagueId },
-  ];
+const SETTLED_TAGS = (leagueId: number) => [
+  { type: "Trades" as const, id: leagueId },
+  { type: "Rosters" as const, id: leagueId },
+  { type: "Salaries" as const, id: leagueId },
+  { type: "Overview" as const, id: leagueId },
+];
 
 export const tradeApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -178,7 +194,8 @@ export const tradeApi = baseApi.injectEndpoints({
       // Accepting the last outstanding reply can process the trade outright
       // when the league does not require approval, so this invalidates
       // everything a settled trade touches.
-      invalidatesTags: (_result, _error, { leagueId }) => SETTLED_TAGS(leagueId),
+      invalidatesTags: (_result, _error, { leagueId }) =>
+        SETTLED_TAGS(leagueId),
     }),
 
     withdrawTrade: builder.mutation<
@@ -204,7 +221,8 @@ export const tradeApi = baseApi.injectEndpoints({
         method: "POST",
       }),
       transformResponse: (r: ApiResponse<Trade>) => unwrap(r),
-      invalidatesTags: (_result, _error, { leagueId }) => SETTLED_TAGS(leagueId),
+      invalidatesTags: (_result, _error, { leagueId }) =>
+        SETTLED_TAGS(leagueId),
     }),
 
     rejectTrade: builder.mutation<
@@ -233,3 +251,58 @@ export const {
   useApproveTradeMutation,
   useRejectTradeMutation,
 } = tradeApi;
+
+export type FinderStats = {
+  season: number;
+  gamesPlayed: number;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  to: number;
+  threes: number;
+  fgPct: number;
+  ftPct: number;
+};
+
+export type FinderPlayer = {
+  id: number;
+  playerId: number;
+  name: string;
+  position: string | null;
+  nbaTeam: string | null;
+  headshot: string | null;
+  team: { id: number; name: string; abbr: string; logo: string | null } | null;
+  /** Null until a Super Admin has imported the birthdate. */
+  age: number | null;
+  salary: number | null;
+  capHit: number | null;
+  years: number;
+  /** Null when no game lines have been synced for the season. */
+  stats: FinderStats | null;
+  isMine: boolean;
+};
+
+export type TradeFinderListing = {
+  seasonStartYear: number;
+  /** Which season the averages are from, or null when none exist. */
+  statsSeason: number | null;
+  myTeamId: number | null;
+  players: FinderPlayer[];
+};
+
+export const tradeFinderApi = baseApi.injectEndpoints({
+  endpoints: (builder) => ({
+    tradeFinder: builder.query<TradeFinderListing, { leagueId: number }>({
+      query: ({ leagueId }) => `/leagues/${leagueId}/trades/finder`,
+      transformResponse: (r: ApiResponse<TradeFinderListing>) => unwrap(r),
+      providesTags: (_result, _error, { leagueId }) => [
+        { type: "Rosters" as const, id: leagueId },
+        { type: "Salaries" as const, id: leagueId },
+      ],
+    }),
+  }),
+});
+
+export const { useTradeFinderQuery } = tradeFinderApi;

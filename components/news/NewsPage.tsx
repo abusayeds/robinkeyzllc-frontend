@@ -2,13 +2,22 @@
 
 import { useMemo, useState } from "react";
 import { FiSearch, FiSliders } from "react-icons/fi";
+import { useLeagueNewsQuery } from "@/lib/store/api/endpoints/newsApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import NewsCard from "./NewsCard";
 import NewsSidebar from "./NewsSidebar";
 import { FILTER_TABS, categoryMatchesFilter } from "./category";
 
 export default function NewsPage() {
-  const articles = useAppSelector((state) => state.news.articles);
+  const activeLeague = useAppSelector((s) => s.activeLeague.current);
+  const leagueId = activeLeague?.id;
+
+  const { data, isLoading } = useLeagueNewsQuery(
+    { leagueId: leagueId as number },
+    { skip: !leagueId },
+  );
+
+  const articles = useMemo(() => data?.articles ?? [], [data]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All News");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -25,6 +34,19 @@ export default function NewsPage() {
       }),
     [articles, filter, search]
   );
+
+  if (!leagueId) {
+    return (
+      <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
+        <p className="text-sm font-semibold text-brand-dark">
+          No league selected
+        </p>
+        <p className="mt-1 text-xs text-brand-muted">
+          Open a league from Avora Home to read its news.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -102,9 +124,15 @@ export default function NewsPage() {
           ) : null}
 
           <div className="space-y-3">
-            {filtered.length === 0 ? (
+            {isLoading ? (
               <p className="rounded-xl border border-brand-border bg-white p-8 text-center text-sm text-brand-muted shadow-card">
-                No news matches your filters.
+                Loading the league&apos;s news…
+              </p>
+            ) : filtered.length === 0 ? (
+              <p className="rounded-xl border border-brand-border bg-white p-8 text-center text-sm text-brand-muted shadow-card">
+                {articles.length === 0
+                  ? "Nothing has happened in this league yet. Trades, signings, injuries and calendar dates show up here."
+                  : "No news matches your filters."}
               </p>
             ) : (
               filtered.map((article) => (
@@ -114,7 +142,7 @@ export default function NewsPage() {
           </div>
         </div>
 
-        <NewsSidebar />
+        <NewsSidebar articles={articles} />
       </div>
     </div>
   );

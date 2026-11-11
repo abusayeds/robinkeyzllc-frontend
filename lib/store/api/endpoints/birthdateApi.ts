@@ -3,10 +3,7 @@ import type { ApiResponse } from "../types";
 import type { PlayerCandidate } from "./playerImportApi";
 
 export type BirthdateProblemStatus =
-  | "needsReview"
-  | "notFound"
-  | "invalid"
-  | "conflict";
+  "needsReview" | "notFound" | "invalid" | "conflict";
 
 export const BIRTHDATE_PROBLEM_LABEL: Record<BirthdateProblemStatus, string> = {
   needsReview: "Needs review",

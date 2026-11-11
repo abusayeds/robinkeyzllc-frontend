@@ -49,8 +49,7 @@ export const notificationApi = baseApi.injectEndpoints({
         url: "/notifications/unread-count",
         params: params ?? {},
       }),
-      transformResponse: (r: ApiResponse<{ unreadCount: number }>) =>
-        unwrap(r),
+      transformResponse: (r: ApiResponse<{ unreadCount: number }>) => unwrap(r),
       providesTags: ["Notifications"],
     }),
 

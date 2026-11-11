@@ -1,6 +1,16 @@
 import Link from "next/link";
 import { FiArrowRight, FiFlag } from "react-icons/fi";
-import type { NewsArticle } from "@/lib/store/features/newsSlice";
+import type { NewsArticle } from "@/lib/store/api/endpoints/newsApi";
+
+/** The card showed a stored `timeAgo` string; it is worked out now. */
+const timeAgo = (value: string) => {
+  const diff = Date.now() - new Date(value).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days >= 30) return `${Math.floor(days / 30)}mo ago`;
+  if (days >= 1) return `${days}d ago`;
+  const hours = Math.floor(diff / 3_600_000);
+  return hours >= 1 ? `${hours}h ago` : "just now";
+};
 import { CATEGORY_STYLE } from "./category";
 
 export default function NewsCard({ article }: { article: NewsArticle }) {
@@ -28,7 +38,7 @@ export default function NewsCard({ article }: { article: NewsArticle }) {
           ) : null}
         </div>
         <span className="shrink-0 text-xs text-brand-muted">
-          {article.timeAgo}
+          {timeAgo(article.timestamp)}
         </span>
       </div>
 

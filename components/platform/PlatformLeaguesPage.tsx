@@ -3,21 +3,22 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiSearch, FiEye } from "react-icons/fi";
-import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
-  enterLeagueView,
+  usePlatformLeaguesQuery,
   type LeagueStatus,
   type PlatformLeague,
-} from "@/lib/store/features/platformSlice";
+} from "@/lib/store/api/endpoints/platformApi";
+import { setActiveLeague } from "@/lib/store/features/activeLeagueSlice";
+import { enterLeagueView } from "@/lib/store/features/platformSlice";
+import { initials } from "@/lib/avatar";
+import { useAppDispatch } from "@/lib/store/hooks";
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
 function statusTone(s: LeagueStatus) {
   if (s === "Active") return "text-brand-cta-dark";
@@ -28,7 +29,9 @@ function statusTone(s: LeagueStatus) {
 export default function PlatformLeaguesPage() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const leagues = useAppSelector((s) => s.platform.leagues);
+
+  const { data: leagues = [], isLoading } = usePlatformLeaguesQuery();
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | LeagueStatus>("All");
   const [sort, setSort] = useState<"Newest" | "Teams">("Newest");
@@ -40,18 +43,39 @@ export default function PlatformLeaguesPage() {
       if (
         q &&
         !l.name.toLowerCase().includes(q) &&
-        !l.commissioner.toLowerCase().includes(q)
-      )
+        !(l.commissioner?.name ?? "").toLowerCase().includes(q)
+      ) {
         return false;
+      }
       return true;
     });
-    if (sort === "Teams")
-      list = [...list].sort((a, b) => b.teams - a.teams);
+    if (sort === "Teams") list = [...list].sort((a, b) => b.teams - a.teams);
     return list;
   }, [leagues, query, statusFilter, sort]);
 
-  function openLeague(l: PlatformLeague) {
-    dispatch(enterLeagueView({ id: l.id, name: l.name }));
+  /**
+   * Standing an admin inside a league.
+   *
+   * Both slices have to be set: `adminViewingLeague` is what makes the shell
+   * show the commissioner's sidebar, and `activeLeague` is what every League
+   * Office page reads to know which league it is looking at. Setting only the
+   * first left the admin on a working sidebar with every page saying "choose a
+   * league".
+   */
+  function openLeague(league: PlatformLeague) {
+    dispatch(enterLeagueView({ id: league.id, name: league.name }));
+    dispatch(
+      setActiveLeague({
+        id: league.id,
+        name: league.name,
+        logo: league.logo,
+        // Temporary administrative access, which is what the Super Admin
+        // document asks for: the same pages, without taking the role.
+        role: "commissioner",
+        visibility: league.visibility,
+        hasTeam: false,
+      }),
+    );
     router.push("/league-office");
   }
 
@@ -118,16 +142,24 @@ export default function PlatformLeaguesPage() {
                 >
                   <td className="px-5 py-3 font-semibold text-brand-dark">
                     {l.name}
+                    <span className="ml-2 text-xs font-normal text-brand-muted">
+                      {l.season}
+                    </span>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-semibold text-violet-700">
-                        {initials(l.commissioner)}
+                        {initials(l.commissioner?.name ?? "—")}
                       </span>
-                      <span className="text-brand-dark">{l.commissioner}</span>
+                      <span className="text-brand-dark">
+                        {l.commissioner?.name ?? "Unassigned"}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-brand-dark">{l.teams}</td>
+                  <td className="px-5 py-3 text-brand-dark">
+                    {l.teams}
+                    <span className="text-brand-muted"> / {l.teamCount}</span>
+                  </td>
                   <td className="px-5 py-3">
                     <span
                       className={`text-xs font-semibold ${statusTone(l.status)}`}
@@ -135,7 +167,9 @@ export default function PlatformLeaguesPage() {
                       {l.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-brand-muted">{l.created}</td>
+                  <td className="px-5 py-3 text-brand-muted">
+                    {formatDate(l.createdAt)}
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex justify-center">
                       <button
@@ -153,7 +187,16 @@ export default function PlatformLeaguesPage() {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-5 py-8 text-center text-sm text-brand-muted"
+                  >
+                    Loading leagues…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}

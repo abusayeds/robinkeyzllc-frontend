@@ -9,7 +9,8 @@ import type {
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
@@ -49,12 +50,15 @@ export default function ContractsTable({
   deadMoneyRows,
   capHoldRows,
   onView,
+  onExtend,
 }: {
   players: RosterPlayer[];
   seasons: number[];
   deadMoneyRows: { id: number; name: string; amount: number }[];
   capHoldRows: { id: number; name: string; amount: number }[];
   onView: (player: RosterPlayer) => void;
+  /** Left out when looking at somebody else's team. */
+  onExtend?: (player: RosterPlayer) => void;
 }) {
   // Totals are summed from the same rows the table prints, so a column and its
   // footer cannot disagree.
@@ -84,6 +88,12 @@ export default function ContractsTable({
                 {seasonLabel(year)}
               </th>
             ))}
+            {/* V5 asked for this column, and asked that it not be frozen on a
+                phone — so it is an ordinary last column rather than a second
+                sticky one. */}
+            {onExtend ? (
+              <th className="px-3 py-2.5 text-right">Extension</th>
+            ) : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-brand-border">
@@ -130,6 +140,24 @@ export default function ContractsTable({
                   />
                 </td>
               ))}
+              {onExtend ? (
+                <td className="px-3 py-2.5 text-right">
+                  {/* Whether he is actually eligible is Rules 10.7/10.8, and
+                      the modal asks the server. The button opens that answer
+                      rather than guessing it from the row. */}
+                  {player.contract ? (
+                    <button
+                      type="button"
+                      onClick={() => onExtend(player)}
+                      className="whitespace-nowrap rounded-lg border border-brand-border px-2.5 py-1 text-xs font-semibold text-brand-muted transition hover:bg-brand-soft hover:text-brand-dark"
+                    >
+                      Offer
+                    </button>
+                  ) : (
+                    <span className="text-brand-border">—</span>
+                  )}
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -146,6 +174,7 @@ export default function ContractsTable({
                 {short(total)}
               </td>
             ))}
+            {onExtend ? <td /> : null}
           </tr>
         </tfoot>
       </table>

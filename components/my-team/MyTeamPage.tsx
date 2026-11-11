@@ -2,16 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { FiAlertTriangle } from "react-icons/fi";
-import {
-  useMyLeaguesQuery,
-} from "@/lib/store/api/endpoints/leagueApi";
+import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import {
   useSetRosterSlotMutation,
   useTeamRosterQuery,
   type RosterPlayer,
 } from "@/lib/store/api/endpoints/rosterApi";
 import { useAppSelector } from "@/lib/store/hooks";
-import RosterPlayerModal from "./RosterPlayerModal";
+import PlayerDetailModal from "./PlayerDetailModal";
+import TeamIntel from "./TeamIntel";
+import WaiveModal from "./WaiveModal";
 import RosterComposition from "./RosterComposition";
 import RosterTable from "./RosterTable";
 
@@ -21,7 +21,8 @@ type Tab = (typeof TABS)[number];
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
@@ -67,7 +68,8 @@ export default function MyTeamPage() {
     skip: !leagueId,
   });
   const myTeamId = useMemo(
-    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    () =>
+      memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
     [memberships, leagueId],
   );
 
@@ -79,8 +81,12 @@ export default function MyTeamPage() {
   const [setSlot, { isLoading: moving }] = useSetRosterSlotMutation();
 
   const [tab, setTab] = useState<Tab>("Roster");
-  const [detail, setDetail] = useState<RosterPlayer | null>(null);
+  // The card is read by player id, not by roster row: it is the same card the
+  // draft board and Trade Finder open, and a player is a player.
+  const [detail, setDetail] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [waiving, setWaiving] = useState<RosterPlayer | null>(null);
 
   const groups = useMemo(() => {
     const all = data?.players ?? [];
@@ -155,12 +161,33 @@ export default function MyTeamPage() {
             </p>
           </div>
         </div>
+
+        {/* Your own team only. Another team's intel is a read-only badge on
+            its card on the Teams page. */}
+        <TeamIntel
+          leagueId={leagueId}
+          teamId={myTeamId}
+          status={team.intelStatus}
+        />
       </div>
 
       {error ? (
         <div className="flex items-start gap-2 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">
           <FiAlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="flex items-start justify-between gap-2 rounded-lg bg-brand-soft px-4 py-2.5 text-sm text-brand-dark">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 text-xs font-semibold text-brand-muted hover:text-brand-dark"
+          >
+            Dismiss
+          </button>
         </div>
       ) : null}
 
@@ -226,8 +253,11 @@ export default function MyTeamPage() {
         showIrAction={tab !== "Rights Held"}
         irLabel={tab === "Injured Reserve" ? "Activate" : "Move to IR"}
         busy={moving}
-        onView={setDetail}
+        onView={(player) => setDetail(player.playerId)}
         onMove={(player) => void move(player, tab !== "Injured Reserve")}
+        // Rights Held has no contract to waive: those are draft rights, and
+        // releasing them is Article 11's own step.
+        onWaive={tab === "Rights Held" ? undefined : setWaiving}
       />
 
       {data.deadMoneyRows.length > 0 ? (
@@ -261,10 +291,22 @@ export default function MyTeamPage() {
         </div>
       ) : null}
 
-      <RosterPlayerModal
-        player={detail}
-        seasonStartYear={data.seasonStartYear}
+      <PlayerDetailModal
+        playerId={detail}
+        leagueId={leagueId}
         onClose={() => setDetail(null)}
+      />
+
+      <WaiveModal
+        leagueId={leagueId}
+        teamId={myTeamId}
+        leaguePlayerId={waiving?.id ?? null}
+        playerName={waiving?.name ?? ""}
+        onClose={() => setWaiving(null)}
+        onDone={(message) => {
+          setError(null);
+          setNotice(message);
+        }}
       />
     </div>
   );

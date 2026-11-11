@@ -11,9 +11,11 @@ import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import CapSummaryCards from "./CapSummaryCards";
 import ContractsTable from "./ContractsTable";
-import RosterPlayerModal from "./RosterPlayerModal";
+import ExtensionModal from "./ExtensionModal";
+import PlayerDetailModal from "./PlayerDetailModal";
 import { CONTRACTS_SUBNAV } from "./subnav";
 import TeamSelector from "./TeamSelector";
+import { useViewedTeam } from "./viewedTeam";
 
 /** How many seasons the contract grid shows, matching the import template. */
 const SEASON_COLUMNS = 6;
@@ -27,7 +29,8 @@ export default function ContractsPage() {
     skip: !leagueId,
   });
   const myTeamId = useMemo(
-    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    () =>
+      memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
     [memberships, leagueId],
   );
 
@@ -36,15 +39,21 @@ export default function ContractsPage() {
   });
   const teams = useMemo(() => teamList?.teams ?? [], [teamList]);
 
-  const [viewTeamId, setViewTeamId] = useState<number | null>(null);
-  const activeTeamId = viewTeamId ?? myTeamId ?? teams[0]?.id ?? null;
+  const [activeTeamId, setViewTeamId] = useViewedTeam(myTeamId, teams);
 
   const { data, isLoading } = useTeamRosterQuery(
     { leagueId: leagueId as number, teamId: activeTeamId as number },
     { skip: !leagueId || !activeTeamId },
   );
 
-  const [detail, setDetail] = useState<RosterPlayer | null>(null);
+  const [detail, setDetail] = useState<number | null>(null);
+  const [extending, setExtending] = useState<RosterPlayer | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Offering one is only ever something you do to your own players. Viewing
+  // another team's contracts is allowed and is read-only, so the column is
+  // not drawn at all rather than drawn and refused.
+  const isMyTeam = activeTeamId !== null && activeTeamId === myTeamId;
 
   const seasons = useMemo(() => {
     if (!data) return [];
@@ -111,11 +120,28 @@ export default function ContractsPage() {
         ))}
       </nav>
 
+      {notice ? (
+        <div className="flex items-start justify-between gap-2 rounded-lg bg-brand-soft px-4 py-2.5 text-sm text-brand-dark">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 text-xs font-semibold text-brand-muted hover:text-brand-dark"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
       {isLoading || !data ? (
         <p className="text-sm text-brand-muted">Loading…</p>
       ) : (
         <>
-          <CapSummaryCards cap={data.cap} counts={data.counts} rules={data.rules} />
+          <CapSummaryCards
+            cap={data.cap}
+            counts={data.counts}
+            rules={data.rules}
+          />
 
           {data.players.length === 0 ? (
             <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
@@ -133,15 +159,27 @@ export default function ContractsPage() {
               seasons={seasons}
               deadMoneyRows={data.deadMoneyRows}
               capHoldRows={data.capHoldRows}
-              onView={setDetail}
+              onView={(player) => setDetail(player.playerId)}
+              onExtend={isMyTeam ? setExtending : undefined}
             />
           )}
 
-          <RosterPlayerModal
-            player={detail}
-            seasonStartYear={data.seasonStartYear}
+          <PlayerDetailModal
+            playerId={detail}
+            leagueId={leagueId}
             onClose={() => setDetail(null)}
           />
+
+          {myTeamId !== null ? (
+            <ExtensionModal
+              leagueId={leagueId}
+              teamId={myTeamId}
+              leaguePlayerId={extending?.id ?? null}
+              playerName={extending?.name ?? ""}
+              onClose={() => setExtending(null)}
+              onDone={setNotice}
+            />
+          ) : null}
         </>
       )}
     </div>

@@ -1,92 +1,31 @@
-import { createSlice, nanoid, type PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
-export type PlatformRole = "Commissioner" | "Owner";
-export type LeagueStatus = "Active" | "Draft" | "Archived";
-
-export type PlatformUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: PlatformRole;
-  leagues: number;
-  created: string;
-};
-
-export type PlatformLeague = {
-  id: string;
-  name: string;
-  commissioner: string;
-  teams: number;
-  status: LeagueStatus;
-  created: string;
-};
-
+/**
+ * The one piece of platform state the client owns: which league a Super
+ * Admin is standing inside.
+ *
+ * The user and league lists used to live here as fixtures. They are served
+ * by `platformApi` now — `/users/all-user` and `/leagues/all` — so nothing
+ * about the platform is held in the store except this.
+ */
 export type AdminViewingLeague = {
-  id: string;
+  id: number;
   name: string;
 };
 
 type PlatformState = {
-  users: PlatformUser[];
-  leagues: PlatformLeague[];
   adminViewingLeague: AdminViewingLeague | null;
 };
-
-const ROLES: PlatformRole[] = [
-  "Commissioner",
-  "Owner",
-  "Commissioner",
-  "Commissioner",
-  "Owner",
-  "Commissioner",
-  "Owner",
-  "Owner",
-  "Owner",
-];
 
 // Exported so the store can rebuild the slice around the one field it
 // restores from localStorage.
 export const platformInitialState: PlatformState = {
-  users: ROLES.map((role) => ({
-    id: nanoid(6),
-    name: "Robin Keyz",
-    email: "robin@avora.app",
-    role,
-    leagues: 3,
-    created: "Jan 12, 2024",
-  })),
-  leagues: Array.from({ length: 8 }, () => ({
-    id: nanoid(6),
-    name: "Celtics Dynasty",
-    commissioner: "Robin Keyz",
-    teams: 12,
-    status: "Active" as LeagueStatus,
-    created: "Jan 12, 2024",
-  })),
   adminViewingLeague: null,
 };
-
 const platformSlice = createSlice({
   name: "platform",
   initialState: platformInitialState,
   reducers: {
-    removePlatformUser(state, action: PayloadAction<string>) {
-      state.users = state.users.filter((u) => u.id !== action.payload);
-    },
-    setUserRole(
-      state,
-      action: PayloadAction<{ id: string; role: PlatformRole }>,
-    ) {
-      const u = state.users.find((x) => x.id === action.payload.id);
-      if (u) u.role = action.payload.role;
-    },
-    setLeagueStatus(
-      state,
-      action: PayloadAction<{ id: string; status: LeagueStatus }>,
-    ) {
-      const l = state.leagues.find((x) => x.id === action.payload.id);
-      if (l) l.status = action.payload.status;
-    },
     enterLeagueView(state, action: PayloadAction<AdminViewingLeague>) {
       state.adminViewingLeague = action.payload;
     },
@@ -104,11 +43,5 @@ const platformSlice = createSlice({
   },
 });
 
-export const {
-  removePlatformUser,
-  setUserRole,
-  setLeagueStatus,
-  enterLeagueView,
-  exitLeagueView,
-} = platformSlice.actions;
+export const { enterLeagueView, exitLeagueView } = platformSlice.actions;
 export default platformSlice.reducer;

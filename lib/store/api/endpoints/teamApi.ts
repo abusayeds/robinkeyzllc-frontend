@@ -16,6 +16,36 @@ export type TeamHolder = {
   role: TeamRole;
 };
 
+/**
+ * League Intel — the four things a team can say it is doing, and nothing else.
+ *
+ * Self-reported: an owner sets their own team's, and every other owner reads
+ * it. Clearing it is `null`, which is a real answer rather than a missing one.
+ */
+export type TeamIntelStatus =
+  "contending" | "rebuilding" | "buying" | "selling";
+
+export const INTEL_OPTIONS: TeamIntelStatus[] = [
+  "contending",
+  "rebuilding",
+  "buying",
+  "selling",
+];
+
+export const INTEL_LABEL: Record<TeamIntelStatus, string> = {
+  contending: "Contending",
+  rebuilding: "Rebuilding",
+  buying: "Buying",
+  selling: "Selling",
+};
+
+export const INTEL_TONE: Record<TeamIntelStatus, string> = {
+  contending: "bg-brand-cta/15 text-brand-cta-dark",
+  rebuilding: "bg-amber-100 text-amber-700",
+  buying: "bg-blue-100 text-blue-700",
+  selling: "bg-brand-soft text-brand-muted",
+};
+
 export type Team = {
   id: number;
   leagueId: number;
@@ -25,6 +55,8 @@ export type Team = {
   logo: string | null;
   owner: TeamHolder | null;
   coOwner: TeamHolder | null;
+  /** Null when this team's owner has not said, or has cleared it. */
+  intelStatus: TeamIntelStatus | null;
   createdAt: string;
 };
 
@@ -50,6 +82,28 @@ export const teamApi = baseApi.injectEndpoints({
       transformResponse: (r: ApiResponse<TeamList>) => unwrap(r),
       providesTags: (_result, _error, leagueId) => [
         { type: "Teams" as const, id: leagueId },
+      ],
+    }),
+
+    setTeamIntel: builder.mutation<
+      Team,
+      {
+        leagueId: number;
+        teamId: number;
+        status: TeamIntelStatus | null;
+      }
+    >({
+      query: ({ leagueId, teamId, status }) => ({
+        url: `/leagues/${leagueId}/teams/${teamId}/intel`,
+        method: "PATCH",
+        body: { status },
+      }),
+      transformResponse: (r: ApiResponse<Team>) => unwrap(r),
+      // The Teams page reads it off the team list, and My Team off its own
+      // roster payload, so both have to be refetched.
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Teams" as const, id: leagueId },
+        { type: "Rosters" as const, id: leagueId },
       ],
     }),
 
@@ -143,6 +197,7 @@ export const teamApi = baseApi.injectEndpoints({
 
 export const {
   useLeagueTeamsQuery,
+  useSetTeamIntelMutation,
   useCreateTeamMutation,
   useUpdateTeamMutation,
   useDeleteTeamMutation,

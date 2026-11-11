@@ -10,6 +10,7 @@ import {
   FiRepeat,
   FiLayers,
   FiUserPlus,
+  FiUserMinus,
 } from "react-icons/fi";
 import { Card, CardHeader } from "@/components/ui/Card";
 import TeamLogo from "@/components/ui/TeamLogo";
@@ -203,10 +204,13 @@ function CapBar({ cap, hardCap }: { cap: TeamDashboard["cap"]; hardCap: TeamDash
   );
 }
 
-const ACTIVITY_ICON: Record<ActivityItem["kind"], React.ReactNode> = {
-  trade: <FiRepeat className="h-4 w-4" />,
-  signing: <FiUserPlus className="h-4 w-4" />,
-  pick: <FiLayers className="h-4 w-4" />,
+const ACTIVITY_ICON: Record<ActivityItem["type"], React.ReactNode> = {
+  "Trade Accepted": <FiRepeat className="h-4 w-4" />,
+  "Draft Pick Traded": <FiLayers className="h-4 w-4" />,
+  "Player Signed": <FiUserPlus className="h-4 w-4" />,
+  "Free Agent Signed": <FiUserPlus className="h-4 w-4" />,
+  "Player Waived": <FiUserMinus className="h-4 w-4" />,
+  "Player Drafted": <FiLayers className="h-4 w-4" />,
 };
 
 export default function DashboardPage() {
@@ -700,20 +704,25 @@ export default function DashboardPage() {
               {activity.map((item) => (
                 <li key={item.id} className="flex items-start gap-3">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
-                    {ACTIVITY_ICON[item.kind]}
+                    {ACTIVITY_ICON[item.type]}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold text-brand-dark">
-                        {item.title}
+                        {item.type}
+                        {item.teams ? (
+                          <span className="font-normal text-brand-muted">
+                            {" "}— {item.teams}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="shrink-0 text-xs text-brand-muted">
-                        {timeAgo(item.at)}
+                        {timeAgo(item.date)}
                       </span>
                     </div>
-                    {item.detail ? (
+                    {item.description ? (
                       <p className="mt-0.5 text-xs text-brand-muted">
-                        {item.detail}
+                        {item.description}
                       </p>
                     ) : null}
                   </div>

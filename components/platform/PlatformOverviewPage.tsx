@@ -2,45 +2,45 @@
 
 import Link from "next/link";
 import { FiArrowRight } from "react-icons/fi";
+import { usePlatformOverviewQuery } from "@/lib/store/api/endpoints/platformApi";
+import { initials } from "@/lib/avatar";
+import { useAppSelector } from "@/lib/store/hooks";
 
-const STATS = [
-  { label: "Total Leagues", value: "8", sub: "Active: 6", tone: "text-purple-600" },
-  { label: "Total Users", value: "10", sub: "Active: 8", tone: "text-brand-cta-dark" },
-  { label: "Commissioners", value: "4", sub: "Across all leagues", tone: "text-amber-600" },
-  { label: "New This Month", value: "5", sub: "Leagues + Users combined", tone: "text-blue-600" },
-];
-
-const GROWTH = [2, 3, 3, 4, 5, 6, 6, 7, 6, 8, 9, 11];
-const GROWTH_LABELS = ["Sep", "", "Nov", "", "Jan", "", "Mar", "", "May", "", "Jul", ""];
-const SIGNUPS = [4, 5, 7, 8, 11, 12];
-const SIGNUP_LABELS = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-
-const RECENT_LEAGUES = [
-  { name: "Celtics Dynasty", owner: "Robin Keyz", teams: 12, status: "Active" },
-  { name: "King's Court", owner: "Marcus Webb", teams: 10, status: "Active" },
-  { name: "Hoop Dreams League", owner: "Tanya Mills", teams: 8, status: "Active" },
-  { name: "Fantasy Ballers", owner: "Chris Osei", teams: 14, status: "Inactive" },
-  { name: "BK Hoops League", owner: "Dev Patel", teams: 12, status: "Active" },
-];
-
-const RECENT_USERS = [
-  { name: "Robin Keyz", role: "Commissioner", ago: "2h ago", initials: "RK" },
-  { name: "Marcus Webb", role: "Owner", ago: "5h ago", initials: "MW" },
-  { name: "Tanya Mills", role: "Commissioner", ago: "1d ago", initials: "TM" },
-  { name: "Chris Osei", role: "Owner", ago: "3d ago", initials: "CO" },
-  { name: "Dev Patel", role: "Commissioner", ago: "6h ago", initials: "DP" },
-];
+/** "2h ago" — the recent lists are about recency, not dates. */
+const timeAgo = (value: string) => {
+  const diff = Date.now() - new Date(value).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days >= 30) return `${Math.floor(days / 30)}mo ago`;
+  if (days >= 1) return `${days}d ago`;
+  const hours = Math.floor(diff / 3_600_000);
+  return hours >= 1 ? `${hours}h ago` : "just now";
+};
 
 function LineChart({ data, labels }: { data: number[]; labels: string[] }) {
-  const max = Math.max(...data);
+  // Two points are the fewest a line can be drawn between, and an empty
+  // series would make Math.max return -Infinity and every coordinate NaN.
+  if (data.length < 2) {
+    return (
+      <p className="flex h-40 items-center justify-center text-xs text-brand-muted">
+        Not enough history yet.
+      </p>
+    );
+  }
+
+  const max = Math.max(...data) || 1;
   const w = 100;
   const h = 40;
   const pts = data
     .map((v, i) => `${(i / (data.length - 1)) * w},${h - (v / max) * h}`)
     .join(" ");
+
   return (
     <div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-40 w-full">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        className="h-40 w-full"
+      >
         <polyline
           points={`0,${h} ${pts} ${w},${h}`}
           fill="rgba(34,197,94,0.12)"
@@ -58,7 +58,17 @@ function LineChart({ data, labels }: { data: number[]; labels: string[] }) {
 }
 
 function BarChart({ data, labels }: { data: number[]; labels: string[] }) {
-  const max = Math.max(...data);
+  if (data.length === 0) {
+    return (
+      <p className="flex h-40 items-center justify-center text-xs text-brand-muted">
+        No signups yet.
+      </p>
+    );
+  }
+
+  // A run of months with no signups must not divide by zero.
+  const max = Math.max(...data) || 1;
+
   return (
     <div>
       <div className="flex h-40 items-end gap-3">
@@ -74,8 +84,8 @@ function BarChart({ data, labels }: { data: number[]; labels: string[] }) {
         ))}
       </div>
       <div className="mt-1 flex gap-3 text-[10px] text-brand-muted">
-        {labels.map((l) => (
-          <span key={l} className="flex-1 text-center">
+        {labels.map((l, i) => (
+          <span key={i} className="flex-1 text-center">
             {l}
           </span>
         ))}
@@ -90,7 +100,9 @@ function StatusPill({ status }: { status: string }) {
       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
         status === "Active"
           ? "bg-brand-cta/15 text-brand-cta-dark"
-          : "bg-red-100 text-red-600"
+          : status === "Draft"
+            ? "bg-amber-100 text-amber-700"
+            : "bg-red-100 text-red-600"
       }`}
     >
       {status}
@@ -99,14 +111,48 @@ function StatusPill({ status }: { status: string }) {
 }
 
 export default function PlatformOverviewPage() {
+  const user = useAppSelector((state) => state.auth.user);
+  const { data, isLoading } = usePlatformOverviewQuery();
+
+  const stats = data?.stats;
+
+  const cards = [
+    {
+      label: "Total Leagues",
+      value: stats?.totalLeagues ?? 0,
+      sub: `Active: ${stats?.activeLeagues ?? 0}`,
+      tone: "text-purple-600",
+    },
+    {
+      label: "Total Users",
+      value: stats?.totalUsers ?? 0,
+      sub: `Active: ${stats?.activeUsers ?? 0}`,
+      tone: "text-brand-cta-dark",
+    },
+    {
+      label: "Commissioners",
+      value: stats?.commissioners ?? 0,
+      sub: "Across all leagues",
+      tone: "text-amber-600",
+    },
+    {
+      label: "New This Month",
+      value: stats?.newThisMonth ?? 0,
+      sub: "Leagues + Users combined",
+      tone: "text-blue-600",
+    },
+  ];
+
   return (
     <div className="space-y-5">
       <p className="text-sm text-brand-muted">
-        Welcome back, Robin. Here&apos;s what&apos;s happening across AVORA.
+        Welcome back
+        {user?.name ? `, ${user.name.split(" ")[0]}` : ""}. Here&apos;s what is
+        happening across AVORA.
       </p>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {STATS.map((s) => (
+        {cards.map((s) => (
           <div
             key={s.label}
             className="rounded-xl border border-brand-border bg-white p-4 shadow-card"
@@ -114,7 +160,9 @@ export default function PlatformOverviewPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-muted">
               {s.label}
             </p>
-            <p className={`mt-1 text-3xl font-bold ${s.tone}`}>{s.value}</p>
+            <p className={`mt-1 text-3xl font-bold ${s.tone}`}>
+              {isLoading ? "—" : s.value}
+            </p>
             <p className="text-xs text-brand-muted">{s.sub}</p>
           </div>
         ))}
@@ -127,19 +175,27 @@ export default function PlatformOverviewPage() {
               League Growth — Last 12 Months
             </p>
             <p className="text-[11px] text-brand-muted">
-              Total leagues created per month
+              Total leagues on the platform
             </p>
           </div>
-          <LineChart data={GROWTH} labels={GROWTH_LABELS} />
+          <LineChart
+            data={(data?.growth ?? []).map((point) => point.value)}
+            labels={(data?.growth ?? []).map((point) => point.label)}
+          />
         </div>
         <div className="rounded-xl border border-brand-border bg-white p-4 shadow-card">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-brand-dark">
               User Signups — Last 6 Months
             </p>
-            <p className="text-[11px] text-brand-muted">New accounts per month</p>
+            <p className="text-[11px] text-brand-muted">
+              New accounts per month
+            </p>
           </div>
-          <BarChart data={SIGNUPS} labels={SIGNUP_LABELS} />
+          <BarChart
+            data={(data?.signups ?? []).map((point) => point.value)}
+            labels={(data?.signups ?? []).map((point) => point.label)}
+          />
         </div>
       </div>
 
@@ -157,22 +213,28 @@ export default function PlatformOverviewPage() {
             </Link>
           </div>
           <ul className="divide-y divide-brand-border">
-            {RECENT_LEAGUES.map((l) => (
-              <li
-                key={l.name}
-                className="flex items-center justify-between py-2.5"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-brand-dark">
-                    {l.name}
-                  </p>
-                  <p className="text-xs text-brand-muted">
-                    {l.owner} · {l.teams} teams
-                  </p>
-                </div>
-                <StatusPill status={l.status} />
+            {(data?.recentLeagues ?? []).length === 0 ? (
+              <li className="py-2.5 text-xs text-brand-muted">
+                {isLoading ? "Loading…" : "No leagues yet."}
               </li>
-            ))}
+            ) : (
+              (data?.recentLeagues ?? []).map((l) => (
+                <li
+                  key={l.id}
+                  className="flex items-center justify-between py-2.5"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-brand-dark">
+                      {l.name}
+                    </p>
+                    <p className="text-xs text-brand-muted">
+                      {l.owner} · {l.teams} of {l.teamCount} teams
+                    </p>
+                  </div>
+                  <StatusPill status={l.status} />
+                </li>
+              ))
+            )}
           </ul>
         </div>
 
@@ -187,22 +249,28 @@ export default function PlatformOverviewPage() {
             </Link>
           </div>
           <ul className="divide-y divide-brand-border">
-            {RECENT_USERS.map((u) => (
-              <li key={u.name} className="flex items-center gap-3 py-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-bold text-brand-dark">
-                  {u.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-brand-dark">
-                    {u.name}
-                  </p>
-                  <p className="text-xs text-brand-muted">
-                    {u.role} · {u.ago}
-                  </p>
-                </div>
-                <StatusPill status="Active" />
+            {(data?.recentUsers ?? []).length === 0 ? (
+              <li className="py-2.5 text-xs text-brand-muted">
+                {isLoading ? "Loading…" : "No users yet."}
               </li>
-            ))}
+            ) : (
+              (data?.recentUsers ?? []).map((u) => (
+                <li key={u.id} className="flex items-center gap-3 py-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-bold text-brand-dark">
+                    {initials(u.name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-brand-dark">
+                      {u.name}
+                    </p>
+                    <p className="text-xs text-brand-muted">
+                      {u.role} · {timeAgo(u.createdAt)}
+                    </p>
+                  </div>
+                  <StatusPill status="Active" />
+                </li>
+              ))
+            )}
           </ul>
         </div>
       </div>

@@ -1,24 +1,25 @@
 "use client";
 
 import TeamLogo from "@/components/ui/TeamLogo";
-import type { DraftSlot } from "@/lib/store/features/draftSlice";
-import type { LeagueTeam } from "@/lib/store/features/leagueSlice";
+import type {
+  BoardSlot,
+  OnTheClock,
+} from "@/lib/store/api/endpoints/draftLiveApi";
 
 export default function DraftClockCard({
-  slot,
-  onClockTeam,
+  onTheClock,
+  ownerName,
   clock,
   strip,
-  teamById,
-  prospectName,
 }: {
-  slot: DraftSlot | undefined;
-  onClockTeam: LeagueTeam | undefined;
-  clock: { label: string; ratio: number };
-  strip: DraftSlot[];
-  teamById: Map<string, LeagueTeam>;
-  prospectName: (s: DraftSlot) => string | undefined;
+  onTheClock: OnTheClock | null;
+  /** Null when nobody owns the team on the clock, which is a real state. */
+  ownerName: string | null;
+  clock: { label: string; ratio: number; expired: boolean };
+  strip: BoardSlot[];
 }) {
+  const team = onTheClock?.team ?? null;
+
   return (
     <div className="rounded-xl border border-brand-border bg-white p-4 shadow-card">
       <div className="flex flex-wrap items-center gap-4">
@@ -36,34 +37,53 @@ export default function DraftClockCard({
         </div>
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
-            On the Clock · Round {slot?.round}, Pick {slot?.pick}
+            {onTheClock
+              ? `On the Clock · Round ${onTheClock.round}, Pick ${onTheClock.pickInRound}`
+              : "Every pick has been made"}
           </p>
           <div className="mt-0.5 flex items-center gap-2">
-            <TeamLogo
-              name={onClockTeam?.name ?? ""}
-              src={onClockTeam?.logo}
-              className="h-6 w-6"
-            />
-            <p className="text-base font-bold text-brand-dark">
-              {onClockTeam?.name}{" "}
-              <span className="font-normal text-brand-muted">
-                ({onClockTeam?.owner})
-              </span>
-            </p>
-            <span className="rounded-full bg-brand-cta/15 px-2 py-0.5 text-[10px] font-bold text-brand-cta-dark">
-              On the Clock
-            </span>
+            {team ? (
+              <>
+                <TeamLogo
+                  name={team.name}
+                  src={team.logo}
+                  className="h-6 w-6"
+                />
+                <p className="text-base font-bold text-brand-dark">
+                  {team.name}{" "}
+                  {ownerName ? (
+                    <span className="font-normal text-brand-muted">
+                      ({ownerName})
+                    </span>
+                  ) : null}
+                </p>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    clock.expired
+                      ? "bg-red-100 text-red-600"
+                      : "bg-brand-cta/15 text-brand-cta-dark"
+                  }`}
+                >
+                  {/* The server makes the pick on the next read, so this says
+                      what is about to happen rather than claiming it has. */}
+                  {clock.expired ? "Time Expired" : "On the Clock"}
+                </span>
+              </>
+            ) : (
+              <p className="text-base font-bold text-brand-dark">
+                Draft complete
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       <div className="mt-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-        {strip.map((s) => {
-          const t = teamById.get(s.teamId);
-          const isCurrent = s.overall === slot?.overall;
+        {strip.map((slot) => {
+          const isCurrent = slot.overall === onTheClock?.overall;
           return (
             <div
-              key={s.overall}
+              key={slot.overall}
               className={`w-36 shrink-0 rounded-lg border px-2.5 py-2 text-xs ${
                 isCurrent
                   ? "border-brand-cta bg-brand-cta/5"
@@ -71,11 +91,13 @@ export default function DraftClockCard({
               }`}
             >
               <p className="text-[10px] font-semibold text-brand-muted">
-                R{s.round}-P{s.pick}
+                R{slot.round}-P{slot.pickInRound}
               </p>
-              <p className="truncate font-medium text-brand-dark">{t?.name}</p>
+              <p className="truncate font-medium text-brand-dark">
+                {slot.team.name}
+              </p>
               <p className="truncate text-brand-muted">
-                {isCurrent ? "On the Clock" : (prospectName(s) ?? "—")}
+                {isCurrent ? "On the Clock" : (slot.player?.name ?? "—")}
               </p>
             </div>
           );

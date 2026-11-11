@@ -1,23 +1,26 @@
 "use client";
 
 import { FiX } from "react-icons/fi";
+import { useDraftPicksQuery } from "@/lib/store/api/endpoints/draftApi";
 import { useTeamRosterQuery } from "@/lib/store/api/endpoints/rosterApi";
 import { useTradeExceptionsQuery } from "@/lib/store/api/endpoints/tradeApi";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
 
 export type PickedAsset = {
-  kind: "player" | "tradeException";
+  kind: "player" | "tradeException" | "draftPick";
   fromTeamId: number;
   toTeamId: number;
   leaguePlayerId?: number;
   tradeExceptionId?: number;
+  draftPickId?: number;
   label: string;
   salary: number;
 };
@@ -57,6 +60,16 @@ export default function TeamPanel({
     teamId,
   });
 
+  // The whole league's inventory, because that is what the endpoint serves and
+  // what the Draft Picks page already reads. A pick this team can send is one
+  // it currently owns and has not used.
+  const { data: inventory } = useDraftPicksQuery(leagueId);
+
+  // The inventory arrives grouped by draft year, so it is flattened once.
+  const myPicks = (inventory?.years ?? [])
+    .flatMap((year) => year.picks)
+    .filter((pick) => pick.currentTeam.id === teamId && pick.usedAt === null);
+
   const mine = picked.filter((asset) => asset.fromTeamId === teamId);
   const sending = mine.reduce((sum, asset) => sum + asset.salary, 0);
   const receiving = picked
@@ -67,12 +80,17 @@ export default function TeamPanel({
   // answer, so the user is not asked a question with one possible reply.
   const defaultTarget = otherTeamIds[0];
 
-  const isPicked = (leaguePlayerId?: number, exceptionId?: number) =>
+  const isPicked = (
+    leaguePlayerId?: number,
+    exceptionId?: number,
+    draftPickId?: number,
+  ) =>
     mine.some(
       (asset) =>
         (leaguePlayerId !== undefined &&
           asset.leaguePlayerId === leaguePlayerId) ||
-        (exceptionId !== undefined && asset.tradeExceptionId === exceptionId),
+        (exceptionId !== undefined && asset.tradeExceptionId === exceptionId) ||
+        (draftPickId !== undefined && asset.draftPickId === draftPickId),
     );
 
   return (
@@ -205,6 +223,71 @@ export default function TeamPanel({
                       </span>
                       <span className="text-xs text-brand-muted">
                         {money(exception.remaining)} left
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+
+        {myPicks.length > 0 ? (
+          <div className="border-t border-brand-border">
+            <p className="px-4 pt-2 text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
+              Draft picks
+            </p>
+            <ul className="divide-y divide-brand-border">
+              {myPicks.map((pick) => {
+                const chosen = isPicked(undefined, undefined, pick.id);
+                return (
+                  <li key={pick.id}>
+                    <button
+                      type="button"
+                      // Rule 12.11 — the engine has already worked out whether
+                      // this one may move, and the server checks it again when
+                      // the trade is sent. Disabling it here means nobody has
+                      // to read a refusal to find out.
+                      disabled={!defaultTarget || !pick.isTradeable}
+                      title={pick.untradeableMessage ?? undefined}
+                      onClick={() =>
+                        onToggle({
+                          kind: "draftPick",
+                          fromTeamId: teamId,
+                          toTeamId: defaultTarget,
+                          draftPickId: pick.id,
+                          label: `${pick.year} ${pick.roundLabel}`,
+                          // A pick is an asset, not money owed, so it adds
+                          // nothing to the salary-matching sum.
+                          salary: 0,
+                        })
+                      }
+                      className={`flex w-full items-center justify-between gap-2 px-4 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        chosen ? "bg-brand-cta/10" : "hover:bg-brand-soft/60"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm text-brand-dark">
+                          {pick.year} {pick.roundLabel}
+                        </span>
+                        {pick.isTraded ? (
+                          <span className="block text-[11px] text-brand-muted">
+                            via {pick.originalTeam.abbr}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 text-right text-xs text-brand-muted">
+                        {pick.isTradeable
+                          ? pick.status === "Protected"
+                            ? `Top-${pick.protectedTopN} protected`
+                            : "Tradeable"
+                          : pick.untradeableReason === "frozen"
+                            ? "Frozen"
+                            : pick.untradeableReason === "backToBack"
+                              ? "Back-to-back"
+                              : pick.untradeableReason === "outsideWindow"
+                                ? "Outside window"
+                                : "Not tradeable"}
                       </span>
                     </button>
                   </li>

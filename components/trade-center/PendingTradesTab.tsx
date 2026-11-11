@@ -112,7 +112,11 @@ export default function PendingTradesTab({
                 <span className="font-semibold text-brand-muted">
                   {to?.team.abbr}
                 </span>
-                <span>{asset.player?.name ?? asset.exception?.label}</span>
+                <span>
+                  {asset.player?.name ??
+                    asset.pick?.label ??
+                    asset.exception?.label}
+                </span>
                 {asset.kind === "player" ? (
                   <span className="ml-auto text-brand-muted">
                     {money(asset.salary)}
@@ -226,7 +230,9 @@ export default function PendingTradesTab({
 
       {!isLoading && trades.length === 0 ? (
         <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
-          <p className="text-sm font-semibold text-brand-dark">No trades yet.</p>
+          <p className="text-sm font-semibold text-brand-dark">
+            No trades yet.
+          </p>
           <p className="mt-1 text-sm text-brand-muted">
             Build one on the other tab, or wait for somebody to offer.
           </p>

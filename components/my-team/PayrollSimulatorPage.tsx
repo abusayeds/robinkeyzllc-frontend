@@ -11,11 +11,13 @@ import NumberField from "@/components/ui/NumberField";
 import { useAppSelector } from "@/lib/store/hooks";
 import { CONTRACTS_SUBNAV } from "./subnav";
 import TeamSelector from "./TeamSelector";
+import { useViewedTeam } from "./viewedTeam";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
@@ -40,7 +42,8 @@ export default function PayrollSimulatorPage() {
     skip: !leagueId,
   });
   const myTeamId = useMemo(
-    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    () =>
+      memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
     [memberships, leagueId],
   );
 
@@ -49,8 +52,7 @@ export default function PayrollSimulatorPage() {
   });
   const teams = useMemo(() => teamList?.teams ?? [], [teamList]);
 
-  const [viewTeamId, setViewTeamId] = useState<number | null>(null);
-  const activeTeamId = viewTeamId ?? myTeamId ?? teams[0]?.id ?? null;
+  const [activeTeamId, setViewTeamId] = useViewedTeam(myTeamId, teams);
 
   const { data: roster } = useTeamRosterQuery(
     { leagueId: leagueId as number, teamId: activeTeamId as number },
@@ -249,8 +251,7 @@ export default function PayrollSimulatorPage() {
                     {scenarioTotals.map((total, index) => {
                       const real = outlook.seasons[index];
                       const space =
-                        salaryCap -
-                        (total + real.deadMoney + real.capHolds);
+                        salaryCap - (total + real.deadMoney + real.capHolds);
                       return (
                         <td
                           key={seasons[index]}
@@ -293,7 +294,9 @@ export default function PayrollSimulatorPage() {
                 {rows.map((row) => (
                   <tr
                     key={row.key}
-                    className={row.isHypothetical ? "bg-brand-cta/5" : undefined}
+                    className={
+                      row.isHypothetical ? "bg-brand-cta/5" : undefined
+                    }
                   >
                     <td className="px-4 py-2 font-medium text-brand-dark">
                       {row.name}

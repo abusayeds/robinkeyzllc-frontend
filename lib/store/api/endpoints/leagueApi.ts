@@ -65,8 +65,7 @@ export const leagueApi = baseApi.injectEndpoints({
 
     createLeague: builder.mutation<ApiLeague, CreateLeagueBody>({
       query: (body) => ({ url: "/leagues", method: "POST", body }),
-      transformResponse: (response: ApiResponse<ApiLeague>) =>
-        unwrap(response),
+      transformResponse: (response: ApiResponse<ApiLeague>) => unwrap(response),
       invalidatesTags: ["Leagues"],
     }),
   }),

@@ -2,46 +2,70 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch, FiMoreVertical } from "react-icons/fi";
-import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { getApiErrorMessage } from "@/lib/store/api";
 import {
-  removePlatformUser,
-  setUserRole,
-  type PlatformRole,
+  useDeletePlatformUserMutation,
+  usePlatformUsersQuery,
   type PlatformUser,
-} from "@/lib/store/features/platformSlice";
+} from "@/lib/store/api/endpoints/platformApi";
+import { avatarSrc, initials } from "@/lib/avatar";
+import Image from "next/image";
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+const ROLES = [
+  "All",
+  "Commissioner",
+  "Co-Commissioner",
+  "Owner",
+  "Member",
+] as const;
+type RoleFilter = (typeof ROLES)[number];
+
+const PAGE_SIZE = 20;
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+function roleTone(role: PlatformUser["leagueRole"]) {
+  if (role === "Commissioner") return "bg-violet-100 text-violet-700";
+  if (role === "Co-Commissioner") return "bg-blue-100 text-blue-700";
+  if (role === "Owner") return "bg-brand-cta/15 text-brand-cta-dark";
+  return "bg-brand-soft text-brand-muted";
 }
 
-function roleTone(r: PlatformRole) {
-  return r === "Commissioner"
-    ? "bg-violet-100 text-violet-700"
-    : "bg-brand-cta/15 text-brand-cta-dark";
-}
-
-function RowMenu({ user }: { user: PlatformUser }) {
-  const dispatch = useAppDispatch();
+/**
+ * The row menu.
+ *
+ * "Make Commissioner" used to sit here. It cannot: a role in AVORA belongs to
+ * a league membership, not to the user, so there is no platform-wide role to
+ * grant — it is assigned inside a league, from its User Assignment page.
+ */
+function RowMenu({
+  user,
+  onRemove,
+  busy,
+}: {
+  user: PlatformUser;
+  onRemove: () => void;
+  busy: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
+      if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
-
-  const nextRole: PlatformRole =
-    user.role === "Commissioner" ? "Owner" : "Commissioner";
 
   return (
     <div ref={ref} className="relative flex justify-center">
@@ -56,28 +80,23 @@ function RowMenu({ user }: { user: PlatformUser }) {
         <div className="absolute right-0 top-9 z-20 w-44 rounded-lg border border-brand-border bg-white py-1 text-sm shadow-lg">
           <button
             type="button"
-            onClick={() => setOpen(false)}
-            className="block w-full px-3 py-2 text-left text-brand-dark hover:bg-brand-soft"
-          >
-            View profile
-          </button>
-          <button
-            type="button"
             onClick={() => {
-              dispatch(setUserRole({ id: user.id, role: nextRole }));
-              setOpen(false);
+              void navigator.clipboard?.writeText(user.email);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
             }}
             className="block w-full px-3 py-2 text-left text-brand-dark hover:bg-brand-soft"
           >
-            Make {nextRole}
+            {copied ? "Copied" : "Copy email"}
           </button>
           <button
             type="button"
+            disabled={busy}
             onClick={() => {
-              dispatch(removePlatformUser(user.id));
+              onRemove();
               setOpen(false);
             }}
-            className="block w-full px-3 py-2 text-left text-red-500 hover:bg-red-50"
+            className="block w-full px-3 py-2 text-left text-red-500 hover:bg-red-50 disabled:opacity-60"
           >
             Remove user
           </button>
@@ -88,23 +107,53 @@ function RowMenu({ user }: { user: PlatformUser }) {
 }
 
 export default function PlatformUsersPage() {
-  const users = useAppSelector((s) => s.platform.users);
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"All" | PlatformRole>("All");
+  const [debounced, setDebounced] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
   const [sort, setSort] = useState<"Newest" | "Name">("Newest");
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+
+  // The search runs on the server, so it waits for the typing to stop rather
+  // than firing a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebounced(query);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const { data, isLoading, isFetching } = usePlatformUsersQuery({
+    page,
+    limit: PAGE_SIZE,
+    searchTerm: debounced,
+  });
+
+  const [removeUser, { isLoading: removing }] = useDeletePlatformUserMutation();
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = users.filter((u) => {
-      if (roleFilter !== "All" && u.role !== roleFilter) return false;
-      if (q && !u.name.toLowerCase().includes(q) && !u.email.includes(q))
-        return false;
-      return true;
-    });
-    if (sort === "Name")
+    let list = data?.users ?? [];
+    // The role is derived per user, so this one filter stays on the client.
+    if (roleFilter !== "All") {
+      list = list.filter((user) => user.leagueRole === roleFilter);
+    }
+    if (sort === "Name") {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
     return list;
-  }, [users, query, roleFilter, sort]);
+  }, [data, roleFilter, sort]);
+
+  const pagination = data?.pagination;
+
+  async function remove(user: PlatformUser) {
+    setError(null);
+    try {
+      await removeUser(user.id).unwrap();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not remove that user."));
+    }
+  }
 
   return (
     <div className="space-y-4 pb-12">
@@ -114,20 +163,20 @@ export default function PlatformUsersPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search leagues or commissioners..."
+            placeholder="Search users by name, email or phone..."
             className="w-full rounded-lg border border-brand-border bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-brand-cta/30"
           />
         </div>
         <select
           value={roleFilter}
-          onChange={(e) =>
-            setRoleFilter(e.target.value as "All" | PlatformRole)
-          }
+          onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
           className="rounded-lg border border-brand-border bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-cta/30"
         >
-          <option value="All">All Roles</option>
-          <option value="Commissioner">Commissioner</option>
-          <option value="Owner">Owner</option>
+          {ROLES.map((item) => (
+            <option key={item} value={item}>
+              {item === "All" ? "All Roles" : item}
+            </option>
+          ))}
         </select>
         <select
           value={sort}
@@ -138,6 +187,12 @@ export default function PlatformUsersPage() {
           <option value="Name">Name A–Z</option>
         </select>
       </div>
+
+      {error ? (
+        <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">
+          {error}
+        </p>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
         <div className="overflow-x-auto">
@@ -153,55 +208,112 @@ export default function PlatformUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
-              {rows.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
-                        {initials(u.name)}
-                      </span>
-                      <span className="font-semibold text-brand-dark">
-                        {u.name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-brand-muted">{u.email}</td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${roleTone(
-                        u.role,
-                      )}`}
-                    >
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-brand-dark">
-                    {String(u.leagues).padStart(2, "0")}
-                  </td>
-                  <td className="px-5 py-3 text-brand-muted">{u.created}</td>
-                  <td className="px-5 py-3">
-                    <RowMenu user={u} />
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 ? (
+              {isLoading ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-5 py-8 text-center text-sm text-brand-muted"
-                  >
-                    No users match your filters.
+                  <td colSpan={6} className="px-5 py-10 text-center text-brand-muted">
+                    Loading users…
                   </td>
                 </tr>
-              ) : null}
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-brand-muted">
+                    No users match this view.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((u) => {
+                  const avatar = avatarSrc(u.image);
+                  return (
+                    <tr key={u.id} className={u.isDeleted ? "opacity-60" : ""}>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
+                            {avatar ? (
+                              <Image
+                                src={avatar}
+                                alt={u.name}
+                                fill
+                                sizes="32px"
+                                unoptimized
+                                className="object-cover"
+                              />
+                            ) : (
+                              initials(u.name)
+                            )}
+                          </span>
+                          <span className="font-semibold text-brand-dark">
+                            {u.name}
+                            {u.role === "superAdmin" ? (
+                              <span className="ml-1.5 rounded bg-brand-dark/10 px-1 py-0.5 text-[10px] font-bold text-brand-dark">
+                                ADMIN
+                              </span>
+                            ) : null}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-brand-muted">
+                        {u.email}
+                        {u.isEmailVerified ? null : (
+                          <span className="ml-1.5 text-[10px] font-semibold text-amber-600">
+                            UNVERIFIED
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${roleTone(
+                            u.leagueRole,
+                          )}`}
+                        >
+                          {u.leagueRole}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-brand-dark">{u.leagues}</td>
+                      <td className="px-5 py-3 text-brand-muted">
+                        {formatDate(u.createdAt)}
+                      </td>
+                      <td className="px-5 py-3">
+                        <RowMenu
+                          user={u}
+                          busy={removing}
+                          onRemove={() => void remove(u)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      <p className="text-xs text-brand-muted">
-        Showing {rows.length} of {users.length} users
-      </p>
+        {pagination && pagination.totalPage > 1 ? (
+          <div className="flex items-center justify-between gap-3 border-t border-brand-border px-5 py-3 text-xs">
+            <span className="text-brand-muted">
+              Page {pagination.page} of {pagination.totalPage} ·{" "}
+              {pagination.totalItem} users
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page <= 1 || isFetching}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-lg border border-brand-border px-3 py-1.5 font-semibold text-brand-dark transition hover:bg-brand-soft disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= pagination.totalPage || isFetching}
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded-lg border border-brand-border px-3 py-1.5 font-semibold text-brand-dark transition hover:bg-brand-soft disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

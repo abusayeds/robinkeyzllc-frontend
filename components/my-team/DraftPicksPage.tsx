@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import DraftPicksTable from "@/components/transactions/DraftPicksTable";
@@ -11,6 +11,7 @@ import { useLeagueTeamsQuery } from "@/lib/store/api/endpoints/teamApi";
 import { useTradeExceptionsQuery } from "@/lib/store/api/endpoints/tradeApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import TeamSelector from "./TeamSelector";
+import { useViewedTeam } from "./viewedTeam";
 import { CONTRACTS_SUBNAV } from "./subnav";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
@@ -43,16 +44,18 @@ export default function DraftPicksPage() {
     skip: !leagueId,
   });
   const myTeamId = useMemo(
-    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    () =>
+      memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
     [memberships, leagueId],
   );
 
-  const { data: teams = [] } = useLeagueTeamsQuery(leagueId as number, {
+  // The endpoint answers with the league's limits as well as its teams.
+  const { data: teamList } = useLeagueTeamsQuery(leagueId as number, {
     skip: !leagueId,
   });
+  const teams = useMemo(() => teamList?.teams ?? [], [teamList]);
 
-  const [viewTeamId, setViewTeamId] = useState<number | null>(null);
-  const teamId = viewTeamId ?? myTeamId ?? teams[0]?.id ?? null;
+  const [teamId, setViewTeamId] = useViewedTeam(myTeamId, teams);
   const team = teams.find((t) => t.id === teamId);
 
   const { data: inventory, isLoading } = useDraftPicksQuery(
@@ -71,14 +74,7 @@ export default function DraftPicksPage() {
   );
 
   function exportPicks() {
-    const header = [
-      "Year",
-      "Round",
-      "Pick",
-      "Source",
-      "Protection",
-      "Notes",
-    ];
+    const header = ["Year", "Round", "Pick", "Source", "Protection", "Notes"];
     const rows = picks.map((pick) => [
       pick.year,
       pick.round,

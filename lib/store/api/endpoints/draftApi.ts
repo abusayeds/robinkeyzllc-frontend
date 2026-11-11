@@ -170,12 +170,31 @@ export type PoolPlayer = {
   headshot: string | null;
   takenBy: { id: number; abbr: string } | null;
   contract: string | null;
+  /** Last completed season. Null before any lines have been synced. */
+  stats: PoolSeasonAverage | null;
+};
+
+export type PoolSeasonAverage = {
+  season: number;
+  gamesPlayed: number;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  to: number;
+  threes: number;
+  /** Whole percent — season makes over season attempts. */
+  fgPct: number;
+  ftPct: number;
 };
 
 export type DraftPool = {
   page: number;
   limit: number;
   total: number;
+  /** The season the `stats` on each row belong to. Null before a backfill. */
+  statsSeason: number | null;
   players: PoolPlayer[];
 };
 

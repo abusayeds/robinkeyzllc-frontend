@@ -2,11 +2,7 @@ import { baseApi, unwrap } from "../baseApi";
 import type { ApiResponse } from "../types";
 
 export type OfferStatus =
-  | "pending"
-  | "accepted"
-  | "declined"
-  | "withdrawn"
-  | "expired";
+  "pending" | "accepted" | "declined" | "withdrawn" | "expired";
 
 export const OFFER_STATUS_LABEL: Record<OfferStatus, string> = {
   pending: "Pending",
@@ -41,6 +37,8 @@ export type Offer = {
   totalValue: number;
   /** What each year of the offer pays, worked out once on the server. */
   schedule: { yearIndex: number; salary: number }[];
+  /** Rule 10.1 — one figure per season, and empty for every other type. */
+  guaranteedAmounts: number[];
   checks: OfferCheck[];
   isLegal: boolean;
   expiresAt: string | null;
@@ -93,6 +91,8 @@ export type PoolOffer = {
   raisePct: number;
   contractType: string;
   signedVia: string;
+  /** Rule 10.1 — one figure per season, and empty for every other type. */
+  guaranteedAmounts: number[];
   totalValue: number;
   expiresAt: string | null;
   createdAt: string;
@@ -152,6 +152,8 @@ export type OfferInput = {
   raisePct?: number;
   contractType?: string;
   signedVia?: string;
+  /** Required for a partially guaranteed offer: one figure per season. */
+  guaranteedAmounts?: number[];
   expiresAt?: string;
 };
 
@@ -194,22 +196,27 @@ export const freeAgencyApi = baseApi.injectEndpoints({
       ],
     }),
 
-    acceptOffer: builder.mutation<Offer, { leagueId: number; offerId: number }>({
-      query: ({ leagueId, offerId }) => ({
-        url: `/leagues/${leagueId}/free-agency/offers/${offerId}/accept`,
-        method: "POST",
-      }),
-      transformResponse: (r: ApiResponse<Offer>) => unwrap(r),
-      // Accepting writes a contract and moves a player, so the roster and cap
-      // screens are no longer current either.
-      invalidatesTags: (_result, _error, { leagueId }) => [
-        { type: "FreeAgency" as const, id: leagueId },
-        { type: "Rosters" as const, id: leagueId },
-        { type: "Salaries" as const, id: leagueId },
-      ],
-    }),
+    acceptOffer: builder.mutation<Offer, { leagueId: number; offerId: number }>(
+      {
+        query: ({ leagueId, offerId }) => ({
+          url: `/leagues/${leagueId}/free-agency/offers/${offerId}/accept`,
+          method: "POST",
+        }),
+        transformResponse: (r: ApiResponse<Offer>) => unwrap(r),
+        // Accepting writes a contract and moves a player, so the roster and cap
+        // screens are no longer current either.
+        invalidatesTags: (_result, _error, { leagueId }) => [
+          { type: "FreeAgency" as const, id: leagueId },
+          { type: "Rosters" as const, id: leagueId },
+          { type: "Salaries" as const, id: leagueId },
+        ],
+      },
+    ),
 
-    declineOffer: builder.mutation<Offer, { leagueId: number; offerId: number }>({
+    declineOffer: builder.mutation<
+      Offer,
+      { leagueId: number; offerId: number }
+    >({
       query: ({ leagueId, offerId }) => ({
         url: `/leagues/${leagueId}/free-agency/offers/${offerId}/decline`,
         method: "POST",
@@ -220,18 +227,19 @@ export const freeAgencyApi = baseApi.injectEndpoints({
       ],
     }),
 
-    withdrawOffer: builder.mutation<Offer, { leagueId: number; offerId: number }>(
-      {
-        query: ({ leagueId, offerId }) => ({
-          url: `/leagues/${leagueId}/free-agency/offers/${offerId}/withdraw`,
-          method: "POST",
-        }),
-        transformResponse: (r: ApiResponse<Offer>) => unwrap(r),
-        invalidatesTags: (_result, _error, { leagueId }) => [
-          { type: "FreeAgency" as const, id: leagueId },
-        ],
-      },
-    ),
+    withdrawOffer: builder.mutation<
+      Offer,
+      { leagueId: number; offerId: number }
+    >({
+      query: ({ leagueId, offerId }) => ({
+        url: `/leagues/${leagueId}/free-agency/offers/${offerId}/withdraw`,
+        method: "POST",
+      }),
+      transformResponse: (r: ApiResponse<Offer>) => unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "FreeAgency" as const, id: leagueId },
+      ],
+    }),
   }),
 });
 

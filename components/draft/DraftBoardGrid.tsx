@@ -1,38 +1,39 @@
 "use client";
 
 import { useMemo } from "react";
-import { useAppSelector } from "@/lib/store/hooks";
+import type { DraftBoard } from "@/lib/store/api/endpoints/draftLiveApi";
+import { initialLastName } from "./utils";
 
-function initialLastName(name: string) {
-  const parts = name.trim().split(" ");
-  if (parts.length < 2) return name;
-  return `${parts[0].charAt(0)}.${parts.slice(1).join(" ")}`;
-}
-
-export default function DraftBoardGrid() {
-  const order = useAppSelector((state) => state.draft.order);
-  const currentPick = useAppSelector((state) => state.draft.currentPick);
-  const leagueTeams = useAppSelector((state) => state.league.leagueTeams);
-  const rookiePool = useAppSelector((state) => state.draft.rookie);
-  const startupPool = useAppSelector((state) => state.draft.startup);
-  const allProspects = useMemo(
-    () => [...rookiePool, ...startupPool],
-    [rookiePool, startupPool]
+/**
+ * The grid, one row per round and one column per team.
+ *
+ * It takes the board rather than reading the store, because the room already
+ * holds it: a second subscription would poll the same endpoint twice and could
+ * draw a round the clock card above it has already moved past.
+ */
+export default function DraftBoardGrid({ board }: { board: DraftBoard }) {
+  const rounds = useMemo(
+    () =>
+      [...new Set(board.picks.map((slot) => slot.round))].sort((a, b) => a - b),
+    [board.picks],
   );
 
-  const teamById = useMemo(
-    () => new Map(leagueTeams.map((t) => [t.id, t])),
-    [leagueTeams]
+  /**
+   * Columns come from round one, in its pick order.
+   *
+   * A snake draft reverses later rounds, so taking the columns from any other
+   * round would transpose the whole grid. Round one is also the round the
+   * commissioner sets by hand (Rule 12.4), so it is the one that defines who
+   * sits where.
+   */
+  const columns = useMemo(
+    () =>
+      board.picks
+        .filter((slot) => slot.round === 1)
+        .sort((a, b) => a.pickInRound - b.pickInRound)
+        .map((slot) => slot.team),
+    [board.picks],
   );
-  const prospectById = useMemo(
-    () => new Map(allProspects.map((p) => [p.id, p])),
-    [allProspects]
-  );
-
-  const rounds = Array.from(new Set(order.map((s) => s.round))).sort();
-  const columns = order
-    .filter((s) => s.round === 1)
-    .map((s) => s.teamId);
 
   return (
     <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
@@ -46,35 +47,37 @@ export default function DraftBoardGrid() {
               <th className="px-3 py-2 text-left font-semibold text-brand-muted">
                 Round
               </th>
-              {columns.map((teamId) => (
+              {columns.map((team) => (
                 <th
-                  key={teamId}
+                  key={team.id}
                   className="px-2 py-2 text-center font-semibold text-brand-dark"
                 >
-                  {(teamById.get(teamId)?.franchise ?? teamById.get(teamId)?.name ?? "")
-                    .split(" ")
-                    .pop()}
+                  {team.abbr || team.name.split(" ").pop()}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-brand-border">
             {rounds.map((round) => {
-              const rowSlots = order.filter((s) => s.round === round);
+              const rowSlots = board.picks.filter(
+                (slot) => slot.round === round,
+              );
               return (
                 <tr key={round}>
                   <td className="px-3 py-2 font-bold text-brand-dark">
                     Round {round}
                   </td>
-                  {columns.map((teamId) => {
-                    const s = rowSlots.find((x) => x.teamId === teamId);
-                    const isCurrent = s?.overall === order[currentPick]?.overall;
-                    const prospect = s?.prospectId
-                      ? prospectById.get(s.prospectId)
-                      : undefined;
+                  {columns.map((team) => {
+                    const slot = rowSlots.find(
+                      (row) => row.team.id === team.id,
+                    );
+                    const isCurrent =
+                      slot !== undefined &&
+                      slot.overall === board.onTheClock?.overall;
+
                     return (
                       <td
-                        key={teamId}
+                        key={team.id}
                         className={`px-2 py-2 text-center ${
                           isCurrent
                             ? "bg-brand-cta/10 font-semibold text-brand-cta-dark"
@@ -83,8 +86,8 @@ export default function DraftBoardGrid() {
                       >
                         {isCurrent
                           ? "On the Clock"
-                          : prospect
-                            ? initialLastName(prospect.name)
+                          : slot?.player
+                            ? initialLastName(slot.player.name)
                             : "—"}
                       </td>
                     );

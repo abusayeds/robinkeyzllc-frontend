@@ -1,12 +1,10 @@
 import { baseApi, unwrap } from "../baseApi";
+import type { TeamIntelStatus } from "./teamApi";
 import type { ApiResponse } from "../types";
 
 export type SlotType = "standard" | "twoWay" | "injuredReserve";
 export type LeaguePlayerStatus =
-  | "rostered"
-  | "rightsHeld"
-  | "freeAgent"
-  | "waived";
+  "rostered" | "rightsHeld" | "freeAgent" | "waived";
 
 export const SLOT_LABEL: Record<SlotType, string> = {
   standard: "Roster",
@@ -36,6 +34,9 @@ export type RosterPlayer = {
   name: string;
   position: string | null;
   nbaTeam: string | null;
+  headshot: string | null;
+  /** Null when he is healthy — the feed only carries the injured. */
+  injury: { status: string; returnDate: string | null } | null;
   experience: number | null;
   experienceIsEstimated: boolean;
   birdYears: number;
@@ -92,6 +93,90 @@ export type LeagueRosters = {
   unassigned: RosterPlayer[];
 };
 
+/** One season of money a waived player leaves behind. */
+export type DeadSeason = { seasonStartYear: number; amount: number };
+
+export type WaivePreview = {
+  playerName: string;
+  seasonStartYear: number;
+  /** The seasons still owed, as the contract stands. */
+  straight: DeadSeason[];
+  straightTotal: number;
+  /** Rule 10.15 — null when the stretch is unavailable, with a reason below. */
+  stretch: DeadSeason[] | null;
+  stretchYears: number;
+  stretchBlockedReason: string | null;
+  /** Rule 10.15 — 15% of the cap, the ceiling on a team's stretched salary. */
+  stretchLimit: number;
+  stretchAlreadyUsed: number;
+};
+
+export type WaiveResult = {
+  playerName: string;
+  stretched: boolean;
+  seasons: DeadSeason[];
+  total: number;
+};
+
+/** Rules 10.2 to 10.8 — what an extension may be worth and how long it runs. */
+export type ExtensionLimits = {
+  kind: "veteran" | "rookieScale";
+  bird: "full" | "early" | "none";
+  priorSalary: number;
+  /** Rule 10.2 — caps every season below it. */
+  maximumSalary: number;
+  /** Rules 10.7 / 10.8 — the most the first new season may pay. */
+  maxFirstYear: number;
+  /** Which rule produced the ceiling, so the screen can say why. */
+  maxFirstYearBasis: string;
+  maxSeasons: number;
+  /** Rule 10.5, as an amount rather than a rate. */
+  raiseStep: number;
+  firstSeasonStartYear: number;
+};
+
+/**
+ * Either the limits, or the reason there are none.
+ *
+ * A refusal is a field rather than an error: the screen has to be able to say
+ * whether an owner should come back next season or never.
+ */
+export type ExtensionOffer =
+  | {
+      eligible: false;
+      blockedReason: string;
+      playerName: string;
+    }
+  | {
+      eligible: true;
+      blockedReason: null;
+      playerName: string;
+      current: {
+        contractId: number;
+        startSeasonStartYear: number;
+        endSeasonStartYear: number;
+        finalSeasonSalary: number;
+      };
+      limits: ExtensionLimits;
+    };
+
+export type ExtensionYear = {
+  seasonStartYear: number;
+  salary: number;
+  optionType: "player" | "team" | null;
+};
+
+export type ExtensionResult = {
+  playerName: string;
+  contract: {
+    id: number;
+    startSeasonStartYear: number;
+    endSeasonStartYear: number;
+    years: ExtensionYear[];
+  };
+  total: number;
+};
+
 export const rosterApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     leagueRosters: builder.query<LeagueRosters, number>({
@@ -121,6 +206,8 @@ export type TeamRosterView = {
     abbr: string;
     color: string;
     logo: string | null;
+    /** League Intel, set by this team's own owner. Null when unset. */
+    intelStatus: TeamIntelStatus | null;
     owner: TeamHolderUser;
     coOwner: TeamHolderUser;
   };
@@ -168,6 +255,80 @@ export const teamRosterApi = baseApi.injectEndpoints({
       ],
     }),
 
+    waivePreview: builder.query<
+      WaivePreview,
+      { leagueId: number; teamId: number; leaguePlayerId: number }
+    >({
+      query: ({ leagueId, teamId, leaguePlayerId }) =>
+        `/leagues/${leagueId}/rosters/${teamId}/players/${leaguePlayerId}/waive-preview`,
+      transformResponse: (r: ApiResponse<WaivePreview>) => unwrap(r),
+      // Not tagged: it is a question about a contract that has not changed,
+      // asked once when the confirmation opens.
+    }),
+
+    waivePlayer: builder.mutation<
+      WaiveResult,
+      {
+        leagueId: number;
+        teamId: number;
+        leaguePlayerId: number;
+        stretch: boolean;
+      }
+    >({
+      query: ({ leagueId, teamId, leaguePlayerId, stretch }) => ({
+        url: `/leagues/${leagueId}/rosters/${teamId}/players/${leaguePlayerId}/waive`,
+        method: "POST",
+        body: { stretch },
+      }),
+      transformResponse: (r: ApiResponse<WaiveResult>) => unwrap(r),
+      // A waive empties a roster spot, writes dead money and ends a contract,
+      // so the roster, the cap sheet and the transactions feed all move.
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Rosters" as const, id: leagueId },
+        { type: "Salaries" as const, id: leagueId },
+        { type: "Trades" as const, id: leagueId },
+        { type: "Overview" as const, id: leagueId },
+      ],
+    }),
+
+    extensionLimits: builder.query<
+      ExtensionOffer,
+      { leagueId: number; teamId: number; leaguePlayerId: number }
+    >({
+      query: ({ leagueId, teamId, leaguePlayerId }) =>
+        `/leagues/${leagueId}/rosters/${teamId}/players/${leaguePlayerId}/extension`,
+      transformResponse: (r: ApiResponse<ExtensionOffer>) => unwrap(r),
+      // Tagged on rosters: signing one extension changes whether the next
+      // player on the same team can have one.
+      providesTags: (_result, _error, { leagueId }) => [
+        { type: "Rosters" as const, id: leagueId },
+      ],
+    }),
+
+    offerExtension: builder.mutation<
+      ExtensionResult,
+      {
+        leagueId: number;
+        teamId: number;
+        leaguePlayerId: number;
+        years: ExtensionYear[];
+      }
+    >({
+      query: ({ leagueId, teamId, leaguePlayerId, years }) => ({
+        url: `/leagues/${leagueId}/rosters/${teamId}/players/${leaguePlayerId}/extension`,
+        method: "POST",
+        body: { years },
+      }),
+      transformResponse: (r: ApiResponse<ExtensionResult>) => unwrap(r),
+      // A second contract on the player, so the roster, the cap sheet and the
+      // multi-season outlook all move.
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Rosters" as const, id: leagueId },
+        { type: "Salaries" as const, id: leagueId },
+        { type: "Overview" as const, id: leagueId },
+      ],
+    }),
+
     setRosterSlot: builder.mutation<
       TeamRosterView,
       {
@@ -191,4 +352,11 @@ export const teamRosterApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useTeamRosterQuery, useSetRosterSlotMutation } = teamRosterApi;
+export const {
+  useTeamRosterQuery,
+  useSetRosterSlotMutation,
+  useWaivePreviewQuery,
+  useWaivePlayerMutation,
+  useExtensionLimitsQuery,
+  useOfferExtensionMutation,
+} = teamRosterApi;

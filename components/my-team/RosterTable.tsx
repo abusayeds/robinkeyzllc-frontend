@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import { avatarSrc } from "@/lib/avatar";
 import {
   SLOT_LABEL,
   type RosterPlayer,
@@ -22,6 +24,7 @@ export default function RosterTable({
   busy,
   onView,
   onMove,
+  onWaive,
 }: {
   players: RosterPlayer[];
   showIrAction: boolean;
@@ -29,6 +32,8 @@ export default function RosterTable({
   busy: boolean;
   onView: (player: RosterPlayer) => void;
   onMove: (player: RosterPlayer) => void;
+  /** Left out on the Rights Held tab: there is no contract to waive. */
+  onWaive?: (player: RosterPlayer) => void;
 }) {
   if (players.length === 0) {
     return (
@@ -60,8 +65,19 @@ export default function RosterTable({
                   onClick={() => onView(player)}
                   className="flex items-center gap-2.5 text-left"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft text-[10px] font-bold text-brand-dark">
-                    {initials(player.name)}
+                  <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-soft text-[10px] font-bold text-brand-dark">
+                    {avatarSrc(player.headshot) ? (
+                      <Image
+                        src={avatarSrc(player.headshot) as string}
+                        alt={player.name}
+                        fill
+                        sizes="28px"
+                        unoptimized
+                        className="object-cover"
+                      />
+                    ) : (
+                      initials(player.name)
+                    )}
                   </span>
                   <span>
                     <span className="flex items-center gap-1.5 font-medium text-brand-dark hover:underline">
@@ -69,6 +85,18 @@ export default function RosterTable({
                       {player.slotType === "twoWay" ? (
                         <span className="inline-flex rounded bg-brand-dark/10 px-1 py-0.5 text-[10px] font-bold text-brand-dark">
                           TW
+                        </span>
+                      ) : null}
+                      {player.injury ? (
+                        <span
+                          className="inline-flex rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold text-red-600"
+                          title={
+                            player.injury.returnDate
+                              ? `Expected back ${new Date(player.injury.returnDate).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+                              : undefined
+                          }
+                        >
+                          {player.injury.status}
                         </span>
                       ) : null}
                     </span>
@@ -97,16 +125,28 @@ export default function RosterTable({
                 )}
               </td>
               <td className="px-4 py-2.5 text-right">
-                {showIrAction && player.slotType !== "twoWay" ? (
-                  <button
-                    type="button"
-                    onClick={() => onMove(player)}
-                    disabled={busy}
-                    className="rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-muted transition hover:bg-brand-soft disabled:opacity-50"
-                  >
-                    {irLabel}
-                  </button>
-                ) : null}
+                <span className="flex items-center justify-end gap-2">
+                  {showIrAction && player.slotType !== "twoWay" ? (
+                    <button
+                      type="button"
+                      onClick={() => onMove(player)}
+                      disabled={busy}
+                      className="rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-muted transition hover:bg-brand-soft disabled:opacity-50"
+                    >
+                      {irLabel}
+                    </button>
+                  ) : null}
+                  {onWaive ? (
+                    <button
+                      type="button"
+                      onClick={() => onWaive(player)}
+                      disabled={busy}
+                      className="rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-muted transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      Waive
+                    </button>
+                  ) : null}
+                </span>
               </td>
             </tr>
           ))}

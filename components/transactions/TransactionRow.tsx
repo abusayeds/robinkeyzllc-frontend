@@ -3,6 +3,7 @@ import {
   FiUserPlus,
   FiUserMinus,
   FiGift,
+  FiLayers,
 } from "react-icons/fi";
 import type {
   TransactionItem,
@@ -32,6 +33,10 @@ const iconConfig: Record<
   "Player Waived": {
     icon: <FiUserMinus className="h-4 w-4" />,
     tone: "bg-amber-100 text-amber-700",
+  },
+  "Player Drafted": {
+    icon: <FiLayers className="h-4 w-4" />,
+    tone: "bg-indigo-100 text-indigo-600",
   },
 };
 

@@ -1,79 +1,49 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { FiSearch, FiStar } from "react-icons/fi";
-import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-import {
-  draftProspect,
-  queueProspect,
-  unqueueProspect,
-  type DraftProspect,
-} from "@/lib/store/features/draftSlice";
 import PlayerDetailModal from "@/components/my-team/PlayerDetailModal";
-import { draftProspectToRosterPlayer } from "./adapter";
+import { getApiErrorMessage } from "@/lib/store/api/baseApi";
+import type { PoolPlayer } from "@/lib/store/api/endpoints/draftApi";
+import DraftBoardGrid from "./DraftBoardGrid";
 import DraftClockCard from "./DraftClockCard";
 import DraftQueue from "./DraftQueue";
-import DraftBoardGrid from "./DraftBoardGrid";
-import { useCountdown } from "./utils";
-
-const FILTERS = ["All", "G", "F", "FLEX", "PF", "C"] as const;
-
-function matchesFilter(pos: string, filter: string) {
-  if (filter === "All") return true;
-  if (filter === "G") return pos === "PG" || pos === "SG";
-  if (filter === "F") return pos === "SF" || pos === "PF";
-  if (filter === "FLEX") return pos !== "C";
-  return pos === filter;
-}
+import DraftRoomBanner from "./DraftRoomBanner";
+import { useDraftRoom } from "./useDraftRoom";
 
 export default function RookieDraft() {
-  const dispatch = useAppDispatch();
-  const rookie = useAppSelector((state) => state.draft.rookie);
-  const order = useAppSelector((state) => state.draft.order);
-  const currentPick = useAppSelector((state) => state.draft.currentPick);
-  const myTeamId = useAppSelector((state) => state.draft.myTeamId);
-  const leagueTeams = useAppSelector((state) => state.league.leagueTeams);
-  const queue = useAppSelector((state) => state.draft.queue);
-  const queueSet = useMemo(() => new Set(queue), [queue]);
+  const room = useDraftRoom("rookie");
+  const [detail, setDetail] = useState<number | null>(null);
 
-  const teamById = useMemo(
-    () => new Map(leagueTeams.map((t) => [t.id, t])),
-    [leagueTeams]
-  );
-  const draftedIds = useMemo(
-    () => new Set(order.map((s) => s.prospectId).filter(Boolean)),
-    [order]
-  );
+  if (!room.leagueId) {
+    return (
+      <p className="text-sm text-brand-muted">
+        Choose a league to open its draft.
+      </p>
+    );
+  }
 
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<string>("All");
-  const [detail, setDetail] = useState<DraftProspect | null>(null);
+  if (room.isLoading) {
+    return <p className="text-sm text-brand-muted">Loading the draft room…</p>;
+  }
 
-  const slot = order[currentPick];
-  const onClockTeam = teamById.get(slot?.teamId ?? "");
-  const clock = useCountdown(372, currentPick);
-
-  const available = rookie.filter(
-    (p) =>
-      !draftedIds.has(p.id) &&
-      matchesFilter(p.position, filter) &&
-      p.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const strip = order.filter((s) => s.round === slot?.round);
-  const myPicks = order.filter((s) => s.teamId === myTeamId);
-
-  const canDraft = slot?.teamId === myTeamId;
+  if (!room.board) {
+    return (
+      <p className="text-sm text-brand-muted">
+        {getApiErrorMessage(room.error, "This draft could not be loaded.")}
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-5">
+      <DraftRoomBanner room={room} />
+
       <DraftClockCard
-        slot={slot}
-        onClockTeam={onClockTeam}
-        clock={clock}
-        strip={strip}
-        teamById={teamById}
-        prospectName={(s) => rookie.find((p) => p.id === s.prospectId)?.name}
+        onTheClock={room.board.onTheClock}
+        ownerName={room.ownerName}
+        clock={room.clock}
+        strip={room.strip}
       />
 
       <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
@@ -83,7 +53,7 @@ export default function RookieDraft() {
               Available Players
             </h3>
             <span className="text-xs text-brand-muted">
-              {available.length} available
+              {room.filtered.length} available
             </span>
           </div>
 
@@ -91,8 +61,8 @@ export default function RookieDraft() {
             <div className="relative min-w-[180px] flex-1">
               <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={room.search}
+                onChange={(e) => room.setSearch(e.target.value)}
                 placeholder="Search by name..."
                 className="w-full rounded-lg border border-brand-border bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-cta focus:ring-2 focus:ring-brand-cta/20"
               />
@@ -100,44 +70,40 @@ export default function RookieDraft() {
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
+            {room.positions.map((position) => (
               <button
-                key={f}
+                key={position}
                 type="button"
-                onClick={() => setFilter(f)}
+                onClick={() => room.setPosition(position)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                  filter === f
+                  room.position === position
                     ? "bg-brand-cta text-white"
                     : "border border-brand-border text-brand-dark hover:bg-brand-soft"
                 }`}
               >
-                {f}
+                {position}
               </button>
             ))}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
             <ul className="divide-y divide-brand-border">
-              {available.map((p) => (
+              {room.filtered.map((player) => (
                 <ProspectRow
-                  key={p.id}
-                  prospect={p}
-                  canDraft={canDraft}
-                  queued={queueSet.has(p.id)}
-                  onDraft={() => dispatch(draftProspect(p.id))}
-                  onQueue={() =>
-                    dispatch(
-                      queueSet.has(p.id)
-                        ? unqueueProspect(p.id)
-                        : queueProspect(p.id)
-                    )
-                  }
-                  onSelect={() => setDetail(p)}
+                  key={player.id}
+                  player={player}
+                  canDraft={room.canPick}
+                  queued={room.queue.includes(player.id)}
+                  onDraft={() => room.makePick(player.id)}
+                  onQueue={() => room.toggleQueue(player.id)}
+                  onSelect={() => setDetail(player.id)}
                 />
               ))}
-              {available.length === 0 ? (
+              {room.filtered.length === 0 ? (
                 <li className="px-4 py-8 text-center text-sm text-brand-muted">
-                  No prospects match.
+                  {room.available.length === 0
+                    ? "No players are left in the rookie pool."
+                    : "No prospects match."}
                 </li>
               ) : null}
             </ul>
@@ -145,48 +111,58 @@ export default function RookieDraft() {
         </div>
 
         <div className="space-y-4">
-          <DraftQueue pool="rookie" />
+          <DraftQueue
+            items={room.queuedPlayers}
+            onRemove={room.removeFromQueue}
+            onSelect={setDetail}
+          />
 
           <div className="rounded-xl border border-brand-border bg-white p-4 shadow-card">
             <h3 className="mb-3 text-sm font-semibold text-brand-dark">
               My Picks
             </h3>
-            <ul className="space-y-1.5 text-xs">
-              {myPicks.map((s) => {
-                const prospect = rookie.find((p) => p.id === s.prospectId);
-                return (
+            {room.myPicks.length === 0 ? (
+              <p className="text-xs text-brand-muted">
+                You hold no picks in this draft.
+              </p>
+            ) : (
+              <ul className="space-y-1.5 text-xs">
+                {room.myPicks.map((slot) => (
                   <li
-                    key={s.overall}
+                    key={slot.overall}
                     className="flex items-center justify-between rounded-lg border border-brand-border px-2.5 py-1.5"
                   >
                     <span className="font-semibold text-brand-muted">
-                      R{s.round}-P{s.pick}
+                      R{slot.round}-P{slot.pickInRound}
                     </span>
-                    {prospect ? (
+                    {slot.player ? (
                       <button
                         type="button"
-                        onClick={() => setDetail(prospect)}
+                        onClick={() => setDetail(slot.player!.id)}
                         className="font-medium text-brand-dark hover:text-brand-cta-dark hover:underline"
                       >
-                        {prospect.name}
+                        {slot.player.name}
                       </button>
                     ) : (
                       <span className="font-medium text-brand-dark">
-                        On the clock
+                        {slot.overall === room.board?.onTheClock?.overall
+                          ? "On the clock"
+                          : "Upcoming"}
                       </span>
                     )}
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>
 
-      <DraftBoardGrid />
+      <DraftBoardGrid board={room.board} />
 
       <PlayerDetailModal
-        player={detail ? draftProspectToRosterPlayer(detail) : null}
+        playerId={detail}
+        leagueId={room.leagueId}
         onClose={() => setDetail(null)}
       />
     </div>
@@ -194,14 +170,14 @@ export default function RookieDraft() {
 }
 
 function ProspectRow({
-  prospect,
+  player,
   canDraft,
   queued,
   onDraft,
   onQueue,
   onSelect,
 }: {
-  prospect: DraftProspect;
+  player: PoolPlayer;
   canDraft: boolean;
   queued: boolean;
   onDraft: () => void;
@@ -212,7 +188,7 @@ function ProspectRow({
     <li className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-forest text-xs font-bold text-brand-accent">
-          {prospect.name.charAt(0)}
+          {player.name.charAt(0)}
         </span>
         <div>
           <button
@@ -220,10 +196,16 @@ function ProspectRow({
             onClick={onSelect}
             className="text-sm font-semibold text-brand-dark hover:text-brand-cta-dark hover:underline"
           >
-            {prospect.name}
+            {player.name}
           </button>
           <p className="text-xs text-brand-muted">
-            {prospect.position} · {prospect.exp} · {prospect.pts.toFixed(1)} PTS
+            {player.position ?? "—"} ·{" "}
+            {player.yearsOfService === null
+              ? "—"
+              : player.yearsOfService === 0
+                ? "Rookie"
+                : `${player.yearsOfService} yrs exp`}{" "}
+            · {player.stats ? `${player.stats.pts.toFixed(1)} PTS` : "No stats"}
           </p>
         </div>
       </div>
@@ -231,14 +213,18 @@ function ProspectRow({
         <button
           type="button"
           onClick={onQueue}
-          aria-label={queued ? `Remove ${prospect.name} from queue` : `Queue ${prospect.name}`}
+          aria-label={
+            queued ? `Remove ${player.name} from queue` : `Queue ${player.name}`
+          }
           className={`rounded-lg border p-1.5 transition ${
             queued
               ? "border-brand-cta bg-brand-cta/10 text-brand-cta-dark"
               : "border-brand-border text-brand-muted hover:bg-brand-soft hover:text-brand-dark"
           }`}
         >
-          <FiStar className={`h-4 w-4 ${queued ? "fill-brand-cta-dark" : ""}`} />
+          <FiStar
+            className={`h-4 w-4 ${queued ? "fill-brand-cta-dark" : ""}`}
+          />
         </button>
         <button
           type="button"

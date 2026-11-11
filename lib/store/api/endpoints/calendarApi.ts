@@ -184,8 +184,9 @@ export const calendarApi = baseApi.injectEndpoints({
         method: "POST",
         params: season ? { season } : {},
       }),
-      transformResponse: (r: ApiResponse<{ season: string; created: number }>) =>
-        unwrap(r),
+      transformResponse: (
+        r: ApiResponse<{ season: string; created: number }>,
+      ) => unwrap(r),
       invalidatesTags: (_result, _error, { leagueId }) => [
         { type: "Calendar" as const, id: leagueId },
       ],

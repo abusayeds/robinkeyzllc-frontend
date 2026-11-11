@@ -5,10 +5,7 @@ import type { ApiLeagueRole, LeagueVisibility } from "./leagueApi";
 export type LeagueSetupMode = "startup" | "import";
 export type FreeAgencyStyle = "dynamic" | "auction";
 export type HardCapThreshold =
-  | "none"
-  | "luxuryTax"
-  | "firstApron"
-  | "secondApron";
+  "none" | "luxuryTax" | "firstApron" | "secondApron";
 
 export const SETUP_MODE_LABEL: Record<LeagueSetupMode, string> = {
   startup: "Startup League",
@@ -62,7 +59,11 @@ export type RosterRules = {
   pregameLockMinutes: number;
 };
 
-export const PREGAME_LOCK_OPTIONS: { value: number; label: string; headline: string }[] = [
+export const PREGAME_LOCK_OPTIONS: {
+  value: number;
+  label: string;
+  headline: string;
+}[] = [
   { value: 5, label: "5 mins", headline: "Strictest - closest to tip-off" },
   { value: 15, label: "15 mins", headline: "Light buffer window" },
   { value: 30, label: "30 mins", headline: "Half-hour pre-game cutoff" },

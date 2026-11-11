@@ -182,9 +182,7 @@ function useSelectResult() {
       router.push("/league-office/teams");
       return;
     }
-    dispatch(
-      setContractsViewTeamId(result.teamId ? String(result.teamId) : null),
-    );
+    dispatch(setContractsViewTeamId(result.teamId));
     router.push("/my-team/contracts");
   };
 }

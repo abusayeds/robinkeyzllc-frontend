@@ -2,32 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { FiBookmark, FiSearch, FiStar, FiX } from "react-icons/fi";
-import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-import {
-  draftProspect,
-  queueProspect,
-  unqueueProspect,
-  type DraftProspect,
-} from "@/lib/store/features/draftSlice";
-import {
-  FIRST_APRON_LINE,
-  SALARY_CAP,
-  SECOND_APRON_LINE,
-  TAX_LINE,
-} from "@/lib/store/features/leagueSlice";
 import PlayerDetailModal from "@/components/my-team/PlayerDetailModal";
-import { draftProspectToRosterPlayer } from "./adapter";
+import { getApiErrorMessage } from "@/lib/store/api/baseApi";
+import { useLeagueSalariesQuery } from "@/lib/store/api/endpoints/salaryApi";
+import { useLeagueTeamsQuery } from "@/lib/store/api/endpoints/teamApi";
+import DraftBoardGrid from "./DraftBoardGrid";
 import DraftClockCard from "./DraftClockCard";
 import DraftQueue from "./DraftQueue";
-import DraftBoardGrid from "./DraftBoardGrid";
-import { moneyFull, useCountdown } from "./utils";
-
-const FILTERS = ["ALL", "PG", "SG", "SF", "PF", "C", "UTIL"] as const;
-
-function matches(pos: string, f: string) {
-  if (f === "ALL" || f === "UTIL") return true;
-  return pos === f;
-}
+import DraftRoomBanner from "./DraftRoomBanner";
+import { useDraftRoom } from "./useDraftRoom";
+import { moneyFull } from "./utils";
 
 function Tile({
   label,
@@ -48,157 +32,148 @@ function Tile({
   );
 }
 
+/** Red once a line has been crossed, which is what every cap tile means. */
+const roomTone = (value: number) =>
+  value < 0 ? "text-red-500" : "text-brand-cta-dark";
+
 export default function StartupDraft() {
-  const dispatch = useAppDispatch();
-  const startup = useAppSelector((state) => state.draft.startup);
-  const rookiePool = useAppSelector((state) => state.draft.rookie);
-  const order = useAppSelector((state) => state.draft.order);
-  const currentPick = useAppSelector((state) => state.draft.currentPick);
-  const myTeamId = useAppSelector((state) => state.draft.myTeamId);
-  const leagueTeams = useAppSelector((state) => state.league.leagueTeams);
-  const queue = useAppSelector((state) => state.draft.queue);
-  const queueSet = useMemo(() => new Set(queue), [queue]);
+  const room = useDraftRoom("startup");
+  const leagueId = room.leagueId;
 
-  const team = useMemo(
-    () => leagueTeams.find((t) => t.id === myTeamId) ?? leagueTeams[0],
-    [leagueTeams, myTeamId]
+  const { data: salaries } = useLeagueSalariesQuery(
+    { leagueId: leagueId as number },
+    { skip: !leagueId },
   );
-  const teamById = useMemo(
-    () => new Map(leagueTeams.map((t) => [t.id, t])),
-    [leagueTeams]
-  );
-  const draftedIds = useMemo(
-    () => new Set(order.map((s) => s.prospectId).filter(Boolean)),
-    [order]
-  );
-  const strip = useMemo(
-    () => order.filter((s) => s.round === order[currentPick]?.round),
-    [order, currentPick]
-  );
-  const allProspects = useMemo(
-    () => [...startup, ...rookiePool],
-    [startup, rookiePool]
+  const { data: teamList } = useLeagueTeamsQuery(leagueId as number, {
+    skip: !leagueId,
+  });
+
+  const [boardPreview, setBoardPreview] = useState<Set<number>>(new Set());
+  const [detail, setDetail] = useState<number | null>(null);
+
+  const myTeamId = room.board?.myTeamId ?? null;
+
+  const myTeam = useMemo(
+    () => salaries?.teams.find((team) => team.id === myTeamId) ?? null,
+    [salaries, myTeamId],
   );
 
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<string>("ALL");
-  const [boardPreview, setBoardPreview] = useState<Set<string>>(new Set());
-  const [detail, setDetail] = useState<DraftProspect | null>(null);
-
-  const slot = order[currentPick];
-  const onClockTeam = teamById.get(slot?.teamId ?? "");
-  const clock = useCountdown(77, currentPick);
-  const canDraft = slot?.teamId === myTeamId;
-
-  const available = startup.filter(
-    (p) =>
-      !draftedIds.has(p.id) &&
-      matches(p.position, filter) &&
-      p.name.toLowerCase().includes(search.toLowerCase())
-  );
-
+  /**
+   * Who this team has already taken in this draft.
+   *
+   * Read off the board rather than the roster, because the two answer
+   * different questions: the roster is every player the team holds, and this
+   * panel is about this draft.
+   */
   const draftedByMe = useMemo(
     () =>
-      order
-        .filter((s) => s.teamId === myTeamId && s.prospectId)
-        .map((s) => allProspects.find((p) => p.id === s.prospectId))
-        .filter((p): p is DraftProspect => Boolean(p)),
-    [order, myTeamId, allProspects]
+      (room.board?.picks ?? [])
+        .filter((slot) => slot.isMine && slot.player !== null)
+        .map((slot) => slot.player!),
+    [room.board],
   );
-  const draftedSalaryTotal = draftedByMe.reduce((s, p) => s + p.salary, 0);
 
-  const previewProspects = startup.filter(
-    (p) => boardPreview.has(p.id) && !draftedIds.has(p.id)
+  const previewPlayers = useMemo(
+    () => room.available.filter((player) => boardPreview.has(player.id)),
+    [room.available, boardPreview],
   );
-  const previewSalaryTotal = previewProspects.reduce((s, p) => s + p.salary, 0);
 
-  const toggleBoardPreview = (id: string) =>
+  const toggleBoardPreview = (playerId: number) =>
     setBoardPreview((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
       return next;
     });
 
-  const hypotheticalPayroll = draftedSalaryTotal + previewSalaryTotal;
-  const impact = [
-    { label: "Total Salary", value: hypotheticalPayroll },
-    { label: "Cap Space", value: SALARY_CAP - hypotheticalPayroll },
-    { label: "Luxury Tax", value: TAX_LINE - hypotheticalPayroll },
-    { label: "1st Apron", value: FIRST_APRON_LINE - hypotheticalPayroll },
-    { label: "2nd Apron", value: SECOND_APRON_LINE - hypotheticalPayroll },
-  ];
-  const overSecondApron = hypotheticalPayroll > SECOND_APRON_LINE;
+  if (!leagueId) {
+    return (
+      <p className="text-sm text-brand-muted">
+        Choose a league to open its draft.
+      </p>
+    );
+  }
 
-  const remainingPicks = order.filter(
-    (s) => s.teamId === myTeamId && !s.prospectId
-  ).length;
-  const nextPick = order.find((s) => s.teamId === myTeamId && !s.prospectId);
+  if (room.isLoading) {
+    return <p className="text-sm text-brand-muted">Loading the draft room…</p>;
+  }
+
+  if (!room.board) {
+    return (
+      <p className="text-sm text-brand-muted">
+        {getApiErrorMessage(room.error, "This draft could not be loaded.")}
+      </p>
+    );
+  }
+
+  const cap = salaries?.cap ?? null;
+  const payroll = myTeam?.totalCommitted ?? 0;
+
+  /**
+   * The cap lines, measured against what the team is already committed to.
+   *
+   * A startup pick writes no contract — the source feed carries no salaries,
+   * which is why the pool reports `contract: null` — so a drafted player adds
+   * nothing to payroll yet and the preview cannot price him either. The tiles
+   * therefore report the team's real position rather than a hypothetical one,
+   * and the preview panel counts players instead of dollars.
+   */
+  const lines: [string, number][] = cap
+    ? [
+        ["Cap Space", cap.salaryCap - payroll],
+        ["Luxury Tax", cap.luxuryTax - payroll],
+        ["1st Apron", cap.firstApron - payroll],
+        ["2nd Apron", cap.secondApron - payroll],
+      ]
+    : [];
 
   return (
     <div className="space-y-5">
+      <DraftRoomBanner room={room} />
+
       <DraftClockCard
-        slot={slot}
-        onClockTeam={onClockTeam}
-        clock={clock}
-        strip={strip}
-        teamById={teamById}
-        prospectName={(s) => allProspects.find((p) => p.id === s.prospectId)?.name}
+        onTheClock={room.board.onTheClock}
+        ownerName={room.ownerName}
+        clock={room.clock}
+        strip={room.strip}
       />
 
       {/* Status bar */}
       <div className="rounded-xl border border-brand-border bg-white p-4 shadow-card">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-brand-muted">
-            Your Team: {team.franchise ?? team.name}
+            Your Team: {myTeam?.name ?? "—"}
           </span>
-          <Tile label="Total Salary" value={moneyFull(draftedSalaryTotal)} />
-          <Tile label="Salary Floor" value={moneyFull(138)} />
+          <Tile label="Total Salary" value={moneyFull(payroll)} />
           <Tile
-            label="Cap Space"
-            value={moneyFull(SALARY_CAP - draftedSalaryTotal)}
-            tone={
-              SALARY_CAP - draftedSalaryTotal < 0
-                ? "text-red-500"
-                : "text-brand-cta-dark"
-            }
+            label="Salary Floor"
+            value={cap ? moneyFull(cap.salaryFloor) : "—"}
           />
-          <Tile
-            label="Luxury Tax"
-            value={moneyFull(TAX_LINE - draftedSalaryTotal)}
-            tone={
-              TAX_LINE - draftedSalaryTotal < 0
-                ? "text-red-500"
-                : "text-brand-cta-dark"
-            }
-          />
-          <Tile
-            label="1st Apron"
-            value={moneyFull(FIRST_APRON_LINE - draftedSalaryTotal)}
-            tone={
-              FIRST_APRON_LINE - draftedSalaryTotal < 0
-                ? "text-red-500"
-                : "text-brand-cta-dark"
-            }
-          />
-          <Tile
-            label="2nd Apron"
-            value={moneyFull(SECOND_APRON_LINE - draftedSalaryTotal)}
-            tone={
-              SECOND_APRON_LINE - draftedSalaryTotal < 0
-                ? "text-red-500"
-                : "text-brand-cta-dark"
-            }
-          />
+          {lines.map(([label, value]) => (
+            <Tile
+              key={label}
+              label={label}
+              value={moneyFull(value)}
+              tone={roomTone(value)}
+            />
+          ))}
           <Tile
             label="Players"
-            value={`${draftedByMe.length}/${team.rosterMax}`}
+            value={
+              myTeam
+                ? `${myTeam.contractCount}/${teamList?.maxRosterSize ?? "—"}`
+                : "—"
+            }
           />
-          <Tile label="2-Way" value="0/3" />
-          <Tile label="Remaining Picks" value={String(remainingPicks)} />
+          <Tile label="Drafted" value={String(draftedByMe.length)} />
+          <Tile label="Remaining Picks" value={String(room.remainingPicks)} />
           <Tile
             label="Next Pick"
-            value={nextPick ? `R${nextPick.round}-P${nextPick.pick}` : "—"}
+            value={
+              room.nextPick
+                ? `R${room.nextPick.round}-P${room.nextPick.pickInRound}`
+                : "—"
+            }
           />
         </div>
       </div>
@@ -209,13 +184,13 @@ export default function StartupDraft() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-brand-dark">
               Available Players{" "}
-              <span className="text-brand-muted">({available.length})</span>
+              <span className="text-brand-muted">({room.filtered.length})</span>
             </h3>
             <div className="relative w-44">
               <FiSearch className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-muted" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={room.search}
+                onChange={(e) => room.setSearch(e.target.value)}
                 placeholder="Search"
                 className="w-full rounded-lg border border-brand-border py-1.5 pl-8 pr-2 text-xs outline-none focus:border-brand-cta"
               />
@@ -223,18 +198,18 @@ export default function StartupDraft() {
           </div>
 
           <div className="flex flex-wrap gap-1">
-            {FILTERS.map((f) => (
+            {room.positions.map((position) => (
               <button
-                key={f}
+                key={position}
                 type="button"
-                onClick={() => setFilter(f)}
+                onClick={() => room.setPosition(position)}
                 className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                  filter === f
+                  room.position === position
                     ? "bg-brand-cta text-white"
                     : "border border-brand-border text-brand-dark hover:bg-brand-soft"
                 }`}
               >
-                {f}
+                {position}
               </button>
             ))}
           </div>
@@ -248,7 +223,7 @@ export default function StartupDraft() {
                     <th className="px-2 py-2 text-left">Player</th>
                     <th className="px-2 py-2 text-center">Pos</th>
                     <th className="px-2 py-2 text-center">Age</th>
-                    <th className="px-2 py-2 text-right">Salary</th>
+                    <th className="px-2 py-2 text-right">Team</th>
                     <th className="px-2 py-2 text-center">PTS</th>
                     <th className="px-2 py-2 text-center">REB</th>
                     <th className="px-2 py-2 text-center">AST</th>
@@ -257,22 +232,20 @@ export default function StartupDraft() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border">
-                  {available.map((p) => {
-                    const onBoard = boardPreview.has(p.id);
-                    const queued = queueSet.has(p.id);
+                  {room.filtered.map((player) => {
+                    const onBoard = boardPreview.has(player.id);
+                    const queued = room.queue.includes(player.id);
                     return (
-                      <tr key={p.id} className="hover:bg-brand-soft/60">
+                      <tr key={player.id} className="hover:bg-brand-soft/60">
                         <td className="px-2 py-2">
                           <button
                             type="button"
                             aria-label={
-                              queued ? `Remove ${p.name} from queue` : `Queue ${p.name}`
+                              queued
+                                ? `Remove ${player.name} from queue`
+                                : `Queue ${player.name}`
                             }
-                            onClick={() =>
-                              dispatch(
-                                queued ? unqueueProspect(p.id) : queueProspect(p.id)
-                              )
-                            }
+                            onClick={() => room.toggleQueue(player.id)}
                             className={`transition ${
                               queued
                                 ? "text-brand-cta-dark"
@@ -287,42 +260,45 @@ export default function StartupDraft() {
                         <td className="px-2 py-2 font-medium text-brand-dark">
                           <button
                             type="button"
-                            onClick={() => setDetail(p)}
+                            onClick={() => setDetail(player.id)}
                             className="hover:text-brand-cta-dark hover:underline"
                           >
-                            {p.name}
+                            {player.name}
                           </button>
                         </td>
                         <td className="px-2 py-2 text-center text-brand-muted">
-                          {p.position}
+                          {player.position ?? "—"}
                         </td>
                         <td className="px-2 py-2 text-center text-brand-muted">
-                          {p.age}
+                          {player.age ?? "—"}
                         </td>
+                        {/* The design priced this column. A startup pool has
+                            no salary source, so it names his NBA team, which
+                            is what the pool actually knows about him. */}
                         <td className="px-2 py-2 text-right font-semibold text-brand-cta-dark">
-                          {moneyFull(p.salary)}
+                          {player.nbaTeam?.abbreviation ?? "—"}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {p.pts.toFixed(1)}
+                          {player.stats ? player.stats.pts.toFixed(1) : "—"}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {p.reb.toFixed(1)}
+                          {player.stats ? player.stats.reb.toFixed(1) : "—"}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {p.ast.toFixed(1)}
+                          {player.stats ? player.stats.ast.toFixed(1) : "—"}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {p.fgPct.toFixed(1)}
+                          {player.stats ? player.stats.fgPct.toFixed(1) : "—"}
                         </td>
                         <td className="px-2 py-2 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
-                              onClick={() => toggleBoardPreview(p.id)}
+                              onClick={() => toggleBoardPreview(player.id)}
                               aria-label={
                                 onBoard
-                                  ? `Remove ${p.name} from draft board`
-                                  : `Add ${p.name} to draft board`
+                                  ? `Remove ${player.name} from draft board`
+                                  : `Add ${player.name} to draft board`
                               }
                               title="Add to Draft Board"
                               className={`rounded p-1 transition ${
@@ -337,8 +313,8 @@ export default function StartupDraft() {
                             </button>
                             <button
                               type="button"
-                              disabled={!canDraft}
-                              onClick={() => dispatch(draftProspect(p.id))}
+                              disabled={!room.canPick}
+                              onClick={() => room.makePick(player.id)}
                               className="rounded-lg bg-brand-cta px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-brand-cta-dark disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               Draft
@@ -348,13 +324,15 @@ export default function StartupDraft() {
                       </tr>
                     );
                   })}
-                  {available.length === 0 ? (
+                  {room.filtered.length === 0 ? (
                     <tr>
                       <td
                         colSpan={10}
                         className="px-2 py-6 text-center text-brand-muted"
                       >
-                        No prospects match.
+                        {room.available.length === 0
+                          ? "Every player has been taken."
+                          : "No players match."}
                       </td>
                     </tr>
                   ) : null}
@@ -378,21 +356,23 @@ export default function StartupDraft() {
             </p>
           ) : (
             <ul className="mt-2 divide-y divide-brand-border text-xs">
-              {draftedByMe.map((p) => (
+              {draftedByMe.map((player) => (
                 <li
-                  key={p.id}
+                  key={player.id}
                   className="flex items-center justify-between gap-2 py-1.5"
                 >
                   <button
                     type="button"
-                    onClick={() => setDetail(p)}
+                    onClick={() => setDetail(player.id)}
                     className="min-w-0 truncate text-left font-medium text-brand-dark hover:text-brand-cta-dark hover:underline"
                   >
-                    {p.name}
-                    <span className="ml-1 text-brand-muted">{p.position}</span>
+                    {player.name}
+                    <span className="ml-1 text-brand-muted">
+                      {player.position ?? ""}
+                    </span>
                   </button>
                   <span className="shrink-0 font-semibold text-brand-cta-dark">
-                    {moneyFull(p.salary)}
+                    {player.nbaTeam?.abbreviation ?? "—"}
                   </span>
                 </li>
               ))}
@@ -400,35 +380,37 @@ export default function StartupDraft() {
           )}
 
           <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-brand-muted">
-            On the Board — Preview ({previewProspects.length})
+            On the Board — Preview ({previewPlayers.length})
           </p>
-          {previewProspects.length === 0 ? (
+          {previewPlayers.length === 0 ? (
             <p className="mt-1 text-xs text-brand-muted">
-              Add available players to preview their cap impact.
+              Bookmark available players to keep them in reach.
             </p>
           ) : (
             <ul className="mt-2 divide-y divide-dashed divide-brand-border text-xs">
-              {previewProspects.map((p) => (
+              {previewPlayers.map((player) => (
                 <li
-                  key={p.id}
+                  key={player.id}
                   className="flex items-center justify-between gap-2 py-1.5"
                 >
                   <button
                     type="button"
-                    onClick={() => setDetail(p)}
+                    onClick={() => setDetail(player.id)}
                     className="min-w-0 truncate text-left font-medium text-brand-dark hover:text-brand-cta-dark hover:underline"
                   >
-                    {p.name}
-                    <span className="ml-1 text-brand-muted">{p.position}</span>
+                    {player.name}
+                    <span className="ml-1 text-brand-muted">
+                      {player.position ?? ""}
+                    </span>
                   </button>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className="font-semibold text-brand-cta-dark">
-                      {moneyFull(p.salary)}
+                      {player.stats ? `${player.stats.pts.toFixed(1)}` : "—"}
                     </span>
                     <button
                       type="button"
-                      onClick={() => toggleBoardPreview(p.id)}
-                      aria-label={`Remove ${p.name} from draft board`}
+                      onClick={() => toggleBoardPreview(player.id)}
+                      aria-label={`Remove ${player.name} from draft board`}
                       className="text-brand-muted transition hover:text-red-500"
                     >
                       <FiX className="h-3.5 w-3.5" />
@@ -440,41 +422,63 @@ export default function StartupDraft() {
           )}
         </div>
 
-        {/* Impact + queue */}
+        {/* Cap position + queue */}
         <div className="space-y-4">
           <div className="rounded-xl border border-brand-border bg-white p-4 shadow-card">
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-brand-muted">
-              Team Impact If Drafted
+              Your Cap Position
             </p>
-            <dl className="space-y-1 text-xs">
-              {impact.map((l) => (
-                <div key={l.label} className="flex justify-between">
-                  <dt className="text-brand-muted">{l.label}</dt>
-                  <dd
-                    className={`font-semibold ${
-                      l.value < 0 ? "text-red-500" : "text-brand-dark"
-                    }`}
-                  >
-                    {moneyFull(l.value)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {overSecondApron ? (
-              <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[10px] text-amber-700">
-                Your current board pushes you past the second apron.
+            {!cap ? (
+              <p className="text-xs text-brand-muted">
+                This league has not set its cap figures yet.
               </p>
-            ) : null}
+            ) : (
+              <>
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <dt className="text-brand-muted">Total Salary</dt>
+                    <dd className="font-semibold text-brand-dark">
+                      {moneyFull(payroll)}
+                    </dd>
+                  </div>
+                  {lines.map(([label, value]) => (
+                    <div key={label} className="flex justify-between">
+                      <dt className="text-brand-muted">{label}</dt>
+                      <dd
+                        className={`font-semibold ${
+                          value < 0 ? "text-red-500" : "text-brand-dark"
+                        }`}
+                      >
+                        {moneyFull(value)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {/* A startup pick carries no salary, so nothing here can be a
+                    forecast. Saying so is better than a tile that silently
+                    never moves. */}
+                <p className="mt-2 rounded bg-brand-soft px-2 py-1 text-[10px] text-brand-muted">
+                  Startup picks carry no contract yet, so drafting does not move
+                  these figures.
+                </p>
+              </>
+            )}
           </div>
 
-          <DraftQueue pool="startup" compact />
+          <DraftQueue
+            items={room.queuedPlayers}
+            compact
+            onRemove={room.removeFromQueue}
+            onSelect={setDetail}
+          />
         </div>
       </div>
 
-      <DraftBoardGrid />
+      <DraftBoardGrid board={room.board} />
 
       <PlayerDetailModal
-        player={detail ? draftProspectToRosterPlayer(detail) : null}
+        playerId={detail}
+        leagueId={leagueId}
         onClose={() => setDetail(null)}
       />
     </div>

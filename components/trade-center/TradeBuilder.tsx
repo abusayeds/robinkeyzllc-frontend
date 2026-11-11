@@ -47,7 +47,11 @@ export default function TradeBuilder({
   const toggle = (asset: PickedAsset) => {
     setPicked((prev) => {
       const key = (a: PickedAsset) =>
-        a.kind === "player" ? `p${a.leaguePlayerId}` : `e${a.tradeExceptionId}`;
+        a.kind === "player"
+          ? `p${a.leaguePlayerId}`
+          : a.kind === "draftPick"
+            ? `d${a.draftPickId}`
+            : `e${a.tradeExceptionId}`;
       const exists = prev.some((a) => key(a) === key(asset));
       return exists
         ? prev.filter((a) => key(a) !== key(asset))
@@ -91,6 +95,7 @@ export default function TradeBuilder({
         toTeamId: asset.toTeamId,
         leaguePlayerId: asset.leaguePlayerId,
         tradeExceptionId: asset.tradeExceptionId,
+        draftPickId: asset.draftPickId,
       })),
       message: message.trim() || undefined,
     };
@@ -169,8 +174,8 @@ export default function TradeBuilder({
             What this trade moves
           </p>
           <p className="text-[11px] text-brand-muted">
-            The league checks the rules when you send it, and records the
-            result either way.
+            The league checks the rules when you send it, and records the result
+            either way.
           </p>
         </div>
 
@@ -217,7 +222,9 @@ export default function TradeBuilder({
                   <span className="text-xs text-brand-muted">
                     {asset.kind === "tradeException"
                       ? "exception"
-                      : money(asset.salary)}
+                      : asset.kind === "draftPick"
+                        ? "pick"
+                        : money(asset.salary)}
                   </span>
                   <button
                     type="button"
