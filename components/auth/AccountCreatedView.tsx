@@ -14,8 +14,17 @@ export default function AccountCreatedView() {
       />
 
       <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-10 text-center backdrop-blur">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-          <Image src="/image/logo.jpg" alt="AVORA" width={40} height={40} />
+        {/* The mark fills the circle rather than floating in the middle of
+            it: a 40px image inside a 64px circle read as a mistake. The same
+            icon the sidebar uses, so the brand is one file. */}
+        <div className="relative mx-auto mb-6 h-16 w-16 overflow-hidden rounded-full bg-white/10">
+          <Image
+            src="/image/logo-icon.png"
+            alt="AVORA"
+            fill
+            sizes="64px"
+            className="object-cover p-1.5"
+          />
         </div>
 
         <h1 className="text-xl font-bold text-white">
