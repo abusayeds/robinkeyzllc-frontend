@@ -45,7 +45,16 @@ export default function Header({
       ?.split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ") ?? "Dashboard";
-  const title = pageTitles[pathname] ?? fallbackTitle;
+
+  // A detail route carries a record's id in its last segment, and dressing
+  // that up as a title put things like "Move Trade 1" in the header. The
+  // longest listed path that this one sits under is the right name for it;
+  // the record's own title belongs inside the page.
+  const parentTitle = Object.keys(pageTitles)
+    .filter((path) => pathname.startsWith(`${path}/`))
+    .sort((a, b) => b.length - a.length)[0];
+
+  const title = pageTitles[pathname] ?? (parentTitle ? pageTitles[parentTitle] : fallbackTitle);
   // Both the greeting and the league name come from the session, which the
   // server render cannot see, so they wait for hydration like the role does.
   const subtitle =
