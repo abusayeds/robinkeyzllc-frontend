@@ -1,5 +1,6 @@
 import { baseApi, unwrap } from "../baseApi";
 import type { ApiResponse } from "../types";
+import type { Tier } from "./salaryApi";
 
 export type TradeStatus =
   | "proposed"
@@ -36,12 +37,27 @@ export const TRADE_STATUS_TONE: Record<TradeStatus, string> = {
   processed: "bg-brand-cta/15 text-brand-cta-dark",
 };
 
+/**
+ * How loudly a result is shown. `blocking` stops the trade, `headsUp` is a
+ * consequence worth knowing before submitting (a hard cap bought, a tier
+ * crossed) and `passed` is collapsed out of the way.
+ */
+export type CheckSeverity = "blocking" | "headsUp" | "passed";
+
 export type TradeCheck = {
   /** Null for a rule about the whole trade rather than one team. */
   teamId: number | null;
+  teamAbbr: string | null;
+  /** Stable across requests, so the list can be grouped and de-duplicated. */
+  code: string;
   label: string;
   pass: boolean;
+  severity: CheckSeverity;
   detail?: string;
+  /** The rule that applied and its arithmetic, on one line. */
+  math?: string;
+  /** One or two ways out, with exact amounts. Only on blocking issues. */
+  toFix?: string[];
 };
 
 export type TradeTeamImpact = {
@@ -85,6 +101,14 @@ export type TradeAsset = {
     label: string;
     protectedTopN: number | null;
     originalTeam: { id: number; abbr: string };
+    /** Rules 12.5-12.7 — the terms this trade set, in one sentence. */
+    protection: {
+      topN: number;
+      outcome: ProtectionOutcome | null;
+      finalYear: number | null;
+      label: string;
+    } | null;
+    protectionNote: string | null;
   } | null;
 };
 
@@ -114,6 +138,9 @@ export type TradeExceptionRow = {
   team: { id: number; name: string; abbr: string };
 };
 
+/** Rule 12.6 — what happens in the year a protection holds. */
+export type ProtectionOutcome = "rollover" | "convert" | "end";
+
 export type ProposeTradeInput = {
   assets: {
     kind: TradeAssetKind;
@@ -122,8 +149,101 @@ export type ProposeTradeInput = {
     leaguePlayerId?: number;
     tradeExceptionId?: number;
     draftPickId?: number;
+    // Rules 12.5-12.7 — the terms agreed on a pick. Only ever set on a pick,
+    // and the server refuses a protection with no outcome.
+    protectedTopN?: number;
+    protectionOutcome?: ProtectionOutcome;
+    protectionFinalYear?: number;
+    protectionNote?: string;
   }[];
   message?: string;
+};
+
+/** One cap threshold measured against where a team lands after the trade. */
+export type CapLine = {
+  label: string;
+  threshold: number;
+  difference: number;
+  isOver: boolean;
+};
+
+export type EvaluatedTeam = {
+  teamId: number;
+  teamName: string;
+  teamAbbr: string | null;
+  /** "Celtics" out of "Boston Celtics" — what the rule lines call the team. */
+  shortName: string;
+  tier: Tier;
+  tierLabel: string;
+  /** The card leads with the move, so it carries both ends of it. */
+  tierBefore: Tier;
+  tierBeforeLabel: string;
+  tierChanged: boolean;
+  playersIn: number;
+  playersOut: number;
+  incoming: number;
+  outgoing: number;
+  salaryBefore: number;
+  salaryAfter: number;
+  /** Net salary was the same number under another name, so only this is sent. */
+  capImpact: number;
+  rosterBefore: number;
+  rosterAfter: number;
+  maxRosterSize: number;
+  rosterMinimum: number;
+  lines: CapLine[];
+  /** Rule 5 — the most this team may take back, when salary matching is on. */
+  maxIncoming: number | null;
+  /** The rule that set the limit, e.g. "Taxpayer rule". */
+  maxIncomingRule: string | null;
+  /** Its arithmetic, e.g. "110% of $7,767,857 + $100,000 = $8,644,642". */
+  maxIncomingFormula: string | null;
+  hardCap: { label: string; amount: number; trigger: string } | null;
+};
+
+export type TradeEvaluation = {
+  isLegal: boolean;
+  capIsSet: boolean;
+  salaryMatching: boolean;
+  apronRules: boolean;
+  deadlinePassed: boolean;
+  deadlineLabel: string | null;
+  checks: TradeCheck[];
+  teams: EvaluatedTeam[];
+};
+
+export type EvaluateTradeInput = {
+  teamIds: number[];
+  assets: ProposeTradeInput['assets'];
+};
+
+export type TradeBlockEntry = {
+  id: number;
+  note: string | null;
+  listedAt: string;
+  team: {
+    id: number;
+    name: string;
+    abbr: string;
+    color: string;
+    logo: string | null;
+  };
+  leaguePlayerId: number;
+  playerId: number;
+  name: string;
+  position: string | null;
+  headshot: string | null;
+  nbaTeam: string | null;
+  birdYears: number;
+  contractType: string | null;
+  yearsLeft: number | null;
+  capHit: number | null;
+};
+
+export type TradeBlock = {
+  myTeamId: number | null;
+  seasonStartYear: number;
+  entries: TradeBlockEntry[];
 };
 
 /** Everything a processed trade touches, so its tags can be written once. */
@@ -148,6 +268,22 @@ export const tradeApi = baseApi.injectEndpoints({
         return `/leagues/${leagueId}/trades${qs ? `?${qs}` : ""}`;
       },
       transformResponse: (r: ApiResponse<Trade[]>) => unwrap(r),
+      providesTags: (_result, _error, { leagueId }) => [
+        { type: "Trades" as const, id: leagueId },
+      ],
+    }),
+
+    // One trade, judged again as it is read: a detail opened tomorrow has to
+    // answer against tomorrow's rosters, not the ones the proposal saw.
+    trade: builder.query<
+      Trade & { evaluation: TradeEvaluation | null },
+      { leagueId: number; tradeId: number }
+    >({
+      query: ({ leagueId, tradeId }) =>
+        `/leagues/${leagueId}/trades/${tradeId}`,
+      transformResponse: (
+        r: ApiResponse<Trade & { evaluation: TradeEvaluation | null }>,
+      ) => unwrap(r),
       providesTags: (_result, _error, { leagueId }) => [
         { type: "Trades" as const, id: leagueId },
       ],
@@ -239,17 +375,77 @@ export const tradeApi = baseApi.injectEndpoints({
         { type: "Trades" as const, id: leagueId },
       ],
     }),
+    /**
+     * What the rules say about a trade nobody has sent yet.
+     *
+     * A mutation rather than a query: it is a POST with a body, and the
+     * builder wants the answer for exactly what is on screen now, not a
+     * cached answer for something it asked about earlier.
+     */
+    evaluateTrade: builder.mutation<
+      TradeEvaluation,
+      { leagueId: number; trade: EvaluateTradeInput }
+    >({
+      query: ({ leagueId, trade }) => ({
+        url: `/leagues/${leagueId}/trades/evaluate`,
+        method: "POST",
+        body: trade,
+      }),
+      transformResponse: (r: ApiResponse<TradeEvaluation>) => unwrap(r),
+    }),
+
+    tradeBlock: builder.query<TradeBlock, { leagueId: number }>({
+      query: ({ leagueId }) => `/leagues/${leagueId}/trades/block`,
+      transformResponse: (r: ApiResponse<TradeBlock>) => unwrap(r),
+      providesTags: (_result, _error, { leagueId }) => [
+        { type: "TradeBlock" as const, id: leagueId },
+      ],
+    }),
+
+    listOnTradeBlock: builder.mutation<
+      TradeBlock,
+      { leagueId: number; leaguePlayerId: number; note?: string }
+    >({
+      query: ({ leagueId, leaguePlayerId, note }) => ({
+        url: `/leagues/${leagueId}/trades/block`,
+        method: "POST",
+        body: { leaguePlayerId, note },
+      }),
+      transformResponse: (r: ApiResponse<TradeBlock>) => unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "TradeBlock" as const, id: leagueId },
+      ],
+    }),
+
+    removeFromTradeBlock: builder.mutation<
+      TradeBlock,
+      { leagueId: number; leaguePlayerId: number }
+    >({
+      query: ({ leagueId, leaguePlayerId }) => ({
+        url: `/leagues/${leagueId}/trades/block/${leaguePlayerId}`,
+        method: "DELETE",
+      }),
+      transformResponse: (r: ApiResponse<TradeBlock>) => unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "TradeBlock" as const, id: leagueId },
+      ],
+    }),
   }),
 });
 
 export const {
   useLeagueTradesQuery,
+  useTradeQuery,
   useTradeExceptionsQuery,
   useProposeTradeMutation,
   useRespondToTradeMutation,
   useWithdrawTradeMutation,
   useApproveTradeMutation,
   useRejectTradeMutation,
+  useEvaluateTradeMutation,
+  useTradeBlockQuery,
+  useListOnTradeBlockMutation,
+  useRemoveFromTradeBlockMutation,
 } = tradeApi;
 
 export type FinderStats = {
