@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   FiAlertTriangle,
@@ -14,6 +14,7 @@ import {
 } from "react-icons/fi";
 import { Card, CardHeader } from "@/components/ui/Card";
 import TeamLogo from "@/components/ui/TeamLogo";
+import StandingsModal from "./StandingsModal";
 import {
   PHASE_COLOR,
   PHASE_LABEL,
@@ -83,12 +84,14 @@ function Tile({
   sub,
   tone = "text-brand-dark",
   href,
+  onClick,
 }: {
   label: string;
   value: string;
   sub?: React.ReactNode;
   tone?: string;
   href?: string;
+  onClick?: () => void;
 }) {
   const body = (
     <>
@@ -99,6 +102,18 @@ function Tile({
       <div className="mt-2 text-xs text-brand-muted">{sub}</div>
     </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="rounded-xl border border-brand-border bg-white p-5 text-left shadow-card transition hover:border-brand-cta/40 hover:shadow-md"
+      >
+        {body}
+      </button>
+    );
+  }
 
   if (href) {
     return (
@@ -260,6 +275,19 @@ export default function DashboardPage() {
     return index < 0 ? null : index + 1;
   }, [table, myTeamId]);
 
+  // Rank within the conference, which the record modal shows beside the
+  // overall one. The table is already in rank order, so position in the
+  // filtered list is the answer.
+  const myConferenceRank = useMemo(() => {
+    if (!myRow) return null;
+    const index = (table?.standings ?? [])
+      .filter((row) => row.conference === myRow.conference)
+      .findIndex((row) => row.id === myTeamId);
+    return index < 0 ? null : index + 1;
+  }, [table, myRow, myTeamId]);
+
+  const [standingsOpen, setStandingsOpen] = useState(false);
+
   /**
    * This team's rank in each category, and a 0-100 bar to draw it with.
    *
@@ -360,7 +388,7 @@ export default function DashboardPage() {
               ? `${myRow.w}-${myRow.l}${myRow.t > 0 ? `-${myRow.t}` : ""}`
               : "0-0"
           }
-          href="/league/standings"
+          onClick={() => setStandingsOpen(true)}
           sub={
             <span className="flex items-center gap-2">
               {myRank ? (
@@ -426,92 +454,11 @@ export default function DashboardPage() {
           }
         />
 
-        <Tile
-          label="UP NEXT"
-          value={nextEvent ? eventDate(nextEvent) : "—"}
-          sub={
-            nextEvent ? (
-              <span className="flex items-center gap-1.5">
-                <span className="truncate">{nextEvent.title}</span>
-                {nextEvent.isLive ? (
-                  <span className="shrink-0 rounded bg-brand-cta/15 px-1.5 py-0.5 text-[10px] font-bold text-brand-cta-dark">
-                    LIVE
-                  </span>
-                ) : null}
-              </span>
-            ) : (
-              "Nothing on the league calendar."
-            )
-          }
-        />
       </div>
 
       {attention.length > 0 ? <Attention items={attention} /> : null}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader
-            title={
-              schedule?.currentWeek
-                ? `Week ${schedule.currentWeek} Matchups`
-                : "Matchups"
-            }
-            href="/league/schedule"
-          />
-          {weekMatchups.length === 0 ? (
-            <p className="text-sm text-brand-muted">
-              No matchups this week. A commissioner draws the schedule from
-              Standings.
-            </p>
-          ) : (
-            <div className="divide-y divide-brand-border">
-              {weekMatchups.map((matchup) => (
-                <div key={matchup.id} className="py-1">
-                  {[
-                    { id: matchup.awayId, score: matchup.awayScore },
-                    { id: matchup.homeId, score: matchup.homeScore },
-                  ].map((side) => {
-                    const team = side.id ? teamsById.get(side.id) : undefined;
-                    const won = matchup.winnerId === side.id;
-                    return (
-                      <div
-                        key={`${matchup.id}-${side.id ?? "tbd"}`}
-                        className="flex items-center justify-between py-2"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <TeamLogo
-                            name={team?.name ?? "TBD"}
-                            src={team?.logo}
-                            className="h-8 w-8 text-xs"
-                            rounded="rounded-full"
-                          />
-                          <span className="truncate text-sm font-medium text-brand-dark">
-                            {team?.name ?? "TBD"}
-                          </span>
-                          <span className="shrink-0 text-xs text-brand-muted">
-                            {team?.record ?? ""}
-                          </span>
-                        </div>
-                        <span
-                          className={`shrink-0 text-sm font-semibold ${
-                            won
-                              ? "text-brand-cta-dark"
-                              : matchup.status === "final"
-                                ? "text-red-500"
-                                : "text-brand-muted"
-                          }`}
-                        >
-                          {matchup.status === "upcoming" ? "—" : side.score}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
         <Card>
           <CardHeader title="Category Standings" href="/league/standings" />
           {categoryStandings.length === 0 ? (
@@ -732,6 +679,16 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+
+      <StandingsModal
+        open={standingsOpen}
+        leagueId={data.league.id}
+        leagueName={data.league.name}
+        team={myRow}
+        rank={myRank}
+        conferenceRank={myConferenceRank}
+        onClose={() => setStandingsOpen(false)}
+      />
     </div>
   );
 }

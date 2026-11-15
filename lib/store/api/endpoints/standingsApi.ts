@@ -22,6 +22,9 @@ export type StandingRow = {
   w: number;
   l: number;
   t: number;
+  /** True when an owner typed this record in rather than it being tallied. */
+  enteredByOwner: boolean;
+  recordUpdatedAt: string | null;
   /** Record inside the team's division, or its conference when it has none. */
   div: string;
   l10: string;
@@ -166,6 +169,31 @@ export const standingsApi = baseApi.injectEndpoints({
       ],
     }),
 
+    // AVORA does not score games, so an owner brings their record in from
+    // wherever their league actually plays. The whole table comes back,
+    // because one record changing reorders everybody.
+    setTeamRecord: builder.mutation<
+      { standings: StandingRow[] },
+      {
+        leagueId: number;
+        teamId: number;
+        wins: number;
+        losses: number;
+        ties: number;
+      }
+    >({
+      query: ({ leagueId, teamId, wins, losses, ties }) => ({
+        url: `/leagues/${leagueId}/standings/teams/${teamId}/record`,
+        method: "PATCH",
+        body: { wins, losses, ties },
+      }),
+      transformResponse: (r: ApiResponse<{ standings: StandingRow[] }>) =>
+        unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Standings" as const, id: leagueId },
+      ],
+    }),
+
     settleWeeks: builder.mutation<{ settled: number[] }, { leagueId: number }>({
       query: ({ leagueId }) => ({
         url: `/leagues/${leagueId}/schedule/settle`,
@@ -185,6 +213,7 @@ export const {
   useCategoryTotalsQuery,
   useLeaguePlayoffsQuery,
   useGenerateScheduleMutation,
+  useSetTeamRecordMutation,
   useSettleWeeksMutation,
 } = standingsApi;
 

@@ -109,7 +109,10 @@ export default function UserMenu() {
   function switchView(target: "owner" | "commissioner") {
     if (role !== target) {
       dispatch(setRole(target));
-      router.push(target === "owner" ? "/my-team" : "/league-office");
+      // Each view lands on its own dashboard: /dashboard for an owner,
+      // /league-office for a commissioner. Dropping an owner on /my-team
+      // skipped past the page their view is built around.
+      router.push(target === "owner" ? "/dashboard" : "/league-office");
     }
     closeMenu();
   }
@@ -133,7 +136,7 @@ export default function UserMenu() {
     const next = keepCommissioner || !league.team ? "commissioner" : "owner";
 
     dispatch(setRole(next));
-    router.push(next === "owner" ? "/my-team" : "/league-office");
+    router.push(next === "owner" ? "/dashboard" : "/league-office");
     closeMenu();
   }
 
