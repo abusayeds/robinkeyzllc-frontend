@@ -122,8 +122,8 @@ export default function StartupDraft() {
     ? [
         ["Cap Space", cap.salaryCap - payroll],
         ["Luxury Tax", cap.luxuryTax - payroll],
-        ["1st Apron", cap.firstApron - payroll],
-        ["2nd Apron", cap.secondApron - payroll],
+        ["First Apron", cap.firstApron - payroll],
+        ["Second Apron", cap.secondApron - payroll],
       ]
     : [];
 

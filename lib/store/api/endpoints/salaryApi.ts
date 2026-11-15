@@ -11,14 +11,28 @@ export type Tier =
   | "firstApron"
   | "secondApron";
 
+/**
+ * One set of names for the whole app — badges, validation lines, cap
+ * summaries, the rule book. The app used to mix "At Tax", "Luxury Tax",
+ * "Over Cap, Below Tax", "1st Apron" and "First Apron" for overlapping
+ * things. "First" and "Second" are spelled out; never "1st"/"2nd".
+ */
 export const TIER_LABEL: Record<Tier, string> = {
   capNotSet: "Cap not set",
-  belowCap: "Below Cap",
-  overCap: "Over Cap, Below Tax",
-  luxuryTax: "Luxury Tax",
+  belowCap: "Under the Cap",
+  overCap: "Over the Cap",
+  luxuryTax: "Taxpayer",
   firstApron: "First Apron",
   secondApron: "Second Apron",
 };
+
+/** The four thresholds, named the same way wherever they are listed. */
+export const CAP_LINE_LABEL = {
+  salaryCap: "Salary Cap",
+  luxuryTax: "Luxury Tax",
+  firstApron: "First Apron",
+  secondApron: "Second Apron",
+} as const;
 
 /** Calm for healthy, warmer the further over a team is. */
 export const TIER_TONE: Record<Tier, string> = {
@@ -28,6 +42,15 @@ export const TIER_TONE: Record<Tier, string> = {
   luxuryTax: "bg-orange-100 text-orange-700",
   firstApron: "bg-red-100 text-red-600",
   secondApron: "bg-red-200 text-red-700",
+};
+
+/** One season of a contract, as the commissioner's edit screen sends it. */
+export type ContractYearEdit = {
+  seasonStartYear: number;
+  salary: number;
+  optionType: "player" | "team" | "earlyTermination" | null;
+  guaranteeType: "full" | "partial" | "none";
+  guaranteedAmount: number | null;
 };
 
 export type SalaryContract = {
@@ -154,10 +177,34 @@ export const salaryApi = baseApi.injectEndpoints({
         { type: "Salaries" as const, id: leagueId },
       ],
     }),
+
+    // Imports and real life disagree, so a commissioner has to be able to fix
+    // one contract without re-uploading a whole league.
+    editContract: builder.mutation<
+      { contractId: number; playerName: string; updated: number },
+      { leagueId: number; contractId: number; years: ContractYearEdit[] }
+    >({
+      query: ({ leagueId, contractId, years }) => ({
+        url: `/leagues/${leagueId}/salaries/contracts/${contractId}`,
+        method: "PATCH",
+        body: { years },
+      }),
+      transformResponse: (
+        r: ApiResponse<{
+          contractId: number;
+          playerName: string;
+          updated: number;
+        }>,
+      ) => unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Salaries" as const, id: leagueId },
+        { type: "Rosters" as const, id: leagueId },
+      ],
+    }),
   }),
 });
 
-export const { useLeagueSalariesQuery } = salaryApi;
+export const { useLeagueSalariesQuery, useEditContractMutation } = salaryApi;
 
 /** Article 4 — the two ceilings a move can buy. */
 export type HardCapApron = "firstApron" | "secondApron";

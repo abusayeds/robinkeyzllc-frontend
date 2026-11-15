@@ -36,12 +36,12 @@ const rows = (team: LeagueTeamRow) => [
     valueClass: moneyTone(team.taxRoom),
   },
   {
-    label: "1st Apron",
+    label: "First Apron",
     value: money(team.firstApronRoom),
     valueClass: moneyTone(team.firstApronRoom),
   },
   {
-    label: "Cap Room",
+    label: "Second Apron",
     value: money(team.secondApronRoom),
     valueClass: moneyTone(team.secondApronRoom),
   },
