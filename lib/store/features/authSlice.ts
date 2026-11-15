@@ -3,6 +3,11 @@ import type { AuthUser } from "../api/types";
 
 export type UserRole = "owner" | "commissioner" | "admin";
 
+// The backend role is platform level only. Commissioner and Team Owner are
+// per league, so a signed-in account starts as owner until a league is opened.
+const toUiRole = (user?: AuthUser | null): UserRole =>
+  user?.role === "superAdmin" ? "admin" : "owner";
+
 export const ROLE_LABEL: Record<UserRole, string> = {
   owner: "Team Owner",
   commissioner: "Commissioner",
@@ -14,6 +19,19 @@ export const ROLE_HOME: Record<UserRole, string> = {
   commissioner: "/home",
   admin: "/platform",
 };
+
+/**
+ * Where a signed-in account lands.
+ *
+ * Only the Super Admin can be routed from the account alone: his pages are
+ * platform-wide and need no league. Commissioner and owner are roles held
+ * *per league* (a person can be both, in different leagues), so the account
+ * says nothing about which one applies until a league is open — they go to
+ * Avora Home and pick one.
+ */
+export function landingFor(user?: AuthUser | null): string {
+  return toUiRole(user) === "admin" ? ROLE_HOME.admin : "/home";
+}
 
 type AuthState = {
   isAuthenticated: boolean;
@@ -30,11 +48,6 @@ export const authInitialState: AuthState = {
   user: null,
   role: "owner",
 };
-
-// The backend role is platform level only. Commissioner and Team Owner are
-// per league, so a signed-in account starts as owner until a league is opened.
-const toUiRole = (user?: AuthUser | null): UserRole =>
-  user?.role === "superAdmin" ? "admin" : "owner";
 
 const authSlice = createSlice({
   name: "auth",

@@ -12,7 +12,7 @@ import {
   FormError,
 } from "@/components/auth/ui";
 import { useAppDispatch } from "@/lib/store/hooks";
-import { ROLE_HOME, type UserRole } from "@/lib/store/features/authSlice";
+import { landingFor } from "@/lib/store/features/authSlice";
 import { startSession } from "@/lib/store/session";
 import {
   getApiErrorMessage,
@@ -20,16 +20,6 @@ import {
   useLoginMutation,
 } from "@/lib/store/api";
 import { clearFlow } from "@/lib/auth-flow";
-
-const DEMO_ROLES: { role: UserRole; label: string; hint: string }[] = [
-  { role: "owner", label: "Team Owner", hint: "Manage your own franchise" },
-  {
-    role: "commissioner",
-    label: "Commissioner",
-    hint: "Run the league office",
-  },
-  { role: "admin", label: "Super Admin", hint: "Platform-wide overview" },
-];
 
 export default function LoginView() {
   const router = useRouter();
@@ -60,7 +50,9 @@ export default function LoginView() {
 
       clearFlow("signup");
       startSession(dispatch, { token: result.token, user: result.user });
-      router.push("/home");
+      // A Super Admin has no league to open, so Avora Home would be an empty
+      // screen for him. Everybody else picks a league first.
+      router.push(landingFor(result.user));
     } catch (err) {
       // 403 means the account exists but was never verified. The otp screen
       // cannot be reached from here because its token only comes from
@@ -68,11 +60,6 @@ export default function LoginView() {
       setNeedsVerification(getApiErrorStatus(err) === 403);
       setError(getApiErrorMessage(err));
     }
-  }
-
-  function loginAsDemo(role: UserRole) {
-    startSession(dispatch, { token: "demo-session-token", role });
-    router.push(ROLE_HOME[role]);
   }
 
   return (
@@ -134,33 +121,6 @@ export default function LoginView() {
           {isLoading ? "Signing in…" : "Sign in"}
         </AuthButton>
       </form>
-
-      <div className="my-6 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
-        <span className="h-px flex-1 bg-brand-border" />
-        Demo pages only
-        <span className="h-px flex-1 bg-brand-border" />
-      </div>
-
-      <div className="space-y-2">
-        {DEMO_ROLES.map((r) => (
-          <button
-            key={r.role}
-            type="button"
-            onClick={() => loginAsDemo(r.role)}
-            className="flex w-full items-center justify-between rounded-lg border border-brand-border px-3.5 py-2.5 text-left transition hover:border-brand-cta/50 hover:bg-brand-cta/5"
-          >
-            <span>
-              <span className="block text-sm font-semibold text-brand-dark">
-                {r.label}
-              </span>
-              <span className="block text-xs text-brand-muted">{r.hint}</span>
-            </span>
-            <span className="text-xs font-semibold text-brand-cta-dark">
-              Enter →
-            </span>
-          </button>
-        ))}
-      </div>
 
       <p className="mt-6 text-center text-sm text-brand-muted">
         Don&apos;t have an account?{" "}

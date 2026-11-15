@@ -1,35 +1,89 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FiVolume2, FiVolumeX } from "react-icons/fi";
 
 const VOLUME = 0.4;
-// Stop playback right before the "Define your Vision" tagline appears,
-// instead of the full ~10s clip.
-const CUTOFF_SECONDS = 6;
+
+/**
+ * Stop playback before the "Define your Vision" tagline fades in, so the
+ * frozen frame is the logo alone.
+ *
+ * Measured against the clip rather than its end: the file runs about ten
+ * seconds and the tagline starts shortly after six, so this leaves room for
+ * the fade to begin without being seen.
+ */
+const CUTOFF_SECONDS = 5.6;
 
 export default function OnboardingView() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [ended, setEnded] = useState(false);
 
+  const stop = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    setEnded(true);
+  }, []);
+
+  // Start it here rather than with `autoPlay`, because only play() hands back
+  // a promise — and a refusal is the one thing this needs to know about.
   useEffect(() => {
-    if (videoRef.current) videoRef.current.volume = VOLUME;
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.volume = VOLUME;
+    video.muted = false;
+
+    video.play().catch(() => {
+      // Chrome and Safari refuse to start a clip with sound until the visitor
+      // has interacted with the site, and a first-time visitor never has. A
+      // silent clip that plays beats a loud one that does not, so it falls
+      // back and the unmute button is there for anyone who wants it.
+      video.muted = true;
+      setMuted(true);
+      void video.play().catch(() => {});
+    });
   }, []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    function onTimeUpdate() {
-      if (video && video.currentTime >= CUTOFF_SECONDS) {
-        video.pause();
-        setEnded(true);
+
+    // `timeupdate` only fires about every 250ms, which is long enough for the
+    // tagline to appear before the pause lands. Where the browser offers
+    // per-frame callbacks the cut is exact; `timeupdate` stays as the fallback.
+    const withFrames = typeof video.requestVideoFrameCallback === "function";
+
+    let handle = 0;
+    function onFrame() {
+      const video = videoRef.current;
+      if (!video) return;
+      if (video.currentTime >= CUTOFF_SECONDS) {
+        stop();
+        return;
       }
+      handle = video.requestVideoFrameCallback(onFrame);
     }
-    video.addEventListener("timeupdate", onTimeUpdate);
-    return () => video.removeEventListener("timeupdate", onTimeUpdate);
-  }, []);
+
+    function onTimeUpdate() {
+      const video = videoRef.current;
+      if (video && video.currentTime >= CUTOFF_SECONDS) stop();
+    }
+
+    if (withFrames) {
+      handle = video.requestVideoFrameCallback(onFrame);
+    } else {
+      video.addEventListener("timeupdate", onTimeUpdate);
+    }
+
+    return () => {
+      if (withFrames) video.cancelVideoFrameCallback?.(handle);
+      else video.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, [stop]);
 
   function toggleSound() {
     const video = videoRef.current;
@@ -37,7 +91,10 @@ export default function OnboardingView() {
     const next = !muted;
     video.volume = VOLUME;
     video.muted = next;
-    if (!next) video.play().catch(() => {});
+    // Unmuting is a click, so the browser allows sound from here on.
+    if (!next && video.currentTime < CUTOFF_SECONDS) {
+      void video.play().catch(() => {});
+    }
     setMuted(next);
   }
 
@@ -47,8 +104,6 @@ export default function OnboardingView() {
         ref={videoRef}
         src="/image/Onboarding2.mp4"
         poster="/image/Onboarding.png"
-        autoPlay
-        muted
         playsInline
         onEnded={() => setEnded(true)}
         className="absolute inset-0 h-full w-full object-contain"
