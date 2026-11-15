@@ -526,8 +526,9 @@ export default function CommissionerStartupDraft() {
                 Startup Player Pool
               </h2>
               <p className="mt-1 text-xs text-brand-muted">
-                The startup draft uses every active NBA player. Contracts come
-                from the same feed as the player sync.
+                The startup draft uses every active NBA player. Salaries come
+                from the global contract database, which the Super Admin loads
+                — the NBA feed publishes no contracts.
               </p>
             </div>
 
@@ -535,8 +536,8 @@ export default function CommissionerStartupDraft() {
               <div className="mb-4 rounded-lg bg-emerald-50 p-4">
                 <h3 className="mb-3 text-sm font-bold text-emerald-900">
                   {data.pool.contractsAvailable
-                    ? "Player Contracts Imported"
-                    : "Players Ready · Contracts Not Synced Yet"}
+                    ? `Player Contracts Loaded · ${data.pool.contractsReferenced.toLocaleString()} players`
+                    : "Players Ready · No Contracts Loaded Yet"}
                 </h3>
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div>
@@ -554,7 +555,9 @@ export default function CommissionerStartupDraft() {
                   <div>
                     <p className="text-emerald-700">Contract Source</p>
                     <p className="text-sm font-bold text-emerald-900">
-                      {data.pool.contractSource}
+                      {data.pool.contractSource === "globalContractDatabase"
+                        ? "Global database"
+                        : "Rookie scale"}
                     </p>
                   </div>
                 </div>

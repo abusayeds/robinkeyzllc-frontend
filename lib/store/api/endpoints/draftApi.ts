@@ -153,6 +153,8 @@ export type DraftSettings = {
     contractSource: string;
     /** False until the contract endpoints are synced, so the column stays empty. */
     contractsAvailable: boolean;
+    /** How many players the global contract database has terms for. */
+    contractsReferenced: number;
   };
 };
 

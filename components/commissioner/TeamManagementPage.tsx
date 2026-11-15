@@ -20,12 +20,27 @@ import {
   type TeamInput,
 } from "@/lib/store/api";
 
-type Draft = { name: string; abbr: string; color: string; logo: string | null };
+type Draft = {
+  name: string;
+  abbr: string;
+  color: string;
+  logo: string | null;
+  conference: "east" | "west";
+  division: string;
+};
+
+/** The standings split on this, so every team belongs to one half. */
+const CONFERENCES: { value: "east" | "west"; label: string }[] = [
+  { value: "east", label: "Eastern Conference" },
+  { value: "west", label: "Western Conference" },
+];
 
 const EMPTY: Draft = {
   name: "",
   abbr: "",
   color: DEFAULT_TEAM_COLOR,
+  conference: "east",
+  division: "",
   logo: null,
 };
 
@@ -63,6 +78,8 @@ function TeamModal({
           abbr: editing.abbr,
           color: editing.color,
           logo: editing.logo,
+          conference: editing.conference ?? "east",
+          division: editing.division ?? "",
         }
       : EMPTY,
   );
@@ -173,6 +190,47 @@ function TeamModal({
               onChange={(e) => set("color", e.target.value)}
               className="h-9 w-16 cursor-pointer rounded border border-brand-border bg-white p-0.5"
             />
+          </div>
+          <div>
+            <label
+              htmlFor="team-conference"
+              className="mb-1 block text-xs font-medium text-brand-dark"
+            >
+              Conference
+            </label>
+            <select
+              id="team-conference"
+              value={draft.conference}
+              onChange={(e) =>
+                set("conference", e.target.value as Draft["conference"])
+              }
+              className="w-full rounded-lg border border-brand-border bg-white px-3 py-2 text-sm text-brand-dark outline-none focus:border-brand-cta"
+            >
+              {CONFERENCES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="team-division"
+              className="mb-1 block text-xs font-medium text-brand-dark"
+            >
+              Division (optional)
+            </label>
+            <input
+              id="team-division"
+              value={draft.division}
+              onChange={(e) => set("division", e.target.value)}
+              maxLength={40}
+              placeholder="Atlantic"
+              className="w-full rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-dark outline-none focus:border-brand-cta"
+            />
+            <p className="mt-1 text-[11px] text-brand-muted">
+              Left blank, the standings group this team by its conference.
+            </p>
           </div>
           <div>
             <p className="mb-1 text-xs font-medium text-brand-dark">
@@ -425,6 +483,8 @@ export default function TeamManagementPage() {
       abbr: draft.abbr.trim().toUpperCase(),
       color: draft.color,
       logo: draft.logo,
+      conference: draft.conference,
+      division: draft.division.trim() || null,
     };
 
     try {

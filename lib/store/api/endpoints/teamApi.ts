@@ -53,6 +53,10 @@ export type Team = {
   abbr: string;
   color: string;
   logo: string | null;
+  /** Which half of the league it plays in. The standings split on it. */
+  conference: "east" | "west";
+  /** Free text; null falls back to the conference in the standings. */
+  division: string | null;
   owner: TeamHolder | null;
   coOwner: TeamHolder | null;
   /** Null when this team's owner has not said, or has cleared it. */
@@ -71,6 +75,9 @@ export type TeamInput = {
   abbr: string;
   color?: string;
   logo?: string | null;
+  conference?: "east" | "west";
+  /** Null clears it, and the standings group by conference instead. */
+  division?: string | null;
 };
 
 export const DEFAULT_TEAM_COLOR = "#2563EB";

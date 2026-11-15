@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LuInfo } from "react-icons/lu";
 import { useAppSelector } from "@/lib/store/hooks";
+import { useCapYearsQuery } from "@/lib/store/api/endpoints/capYearApi";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useSavedFlash } from "@/lib/useSavedFlash";
 import NumberField from "@/components/ui/NumberField";
@@ -75,6 +76,17 @@ export default function SalaryCapSettingsPage() {
   const leagueId = activeLeague?.id;
   const canEdit = canManageLeague(activeLeague);
 
+  // The Super Admin's figure for the newest season on the platform. Used
+  // only to seed a league that has entered nothing of its own.
+  const { data: capYears = [] } = useCapYearsQuery();
+  const defaultCap = useMemo(
+    () =>
+      [...capYears].sort(
+        (a, b) => b.seasonStartYear - a.seasonStartYear,
+      )[0]?.salaryCap ?? null,
+    [capYears],
+  );
+
   const {
     data: settings,
     isLoading,
@@ -96,13 +108,16 @@ export default function SalaryCapSettingsPage() {
     if (!settings || syncedAt.current === settings.updatedAt) return;
     syncedAt.current = settings.updatedAt;
     setForm({
-      salaryCap: settings.salaryCap,
+      // A league that has not entered a cap starts from the Super Admin's
+      // figure for this season rather than from zero, which is what the
+      // page used to show and what nobody could work from.
+      salaryCap: settings.salaryCap || (defaultCap ?? 0),
       minPlayerSalary: settings.minPlayerSalary,
       hardCapEnabled: settings.hardCapEnabled,
       hardCapThreshold: settings.hardCapThreshold,
     });
     setError(null);
-  }, [settings]);
+  }, [settings, defaultCap]);
 
   const saved: Draft | null = useMemo(
     () =>

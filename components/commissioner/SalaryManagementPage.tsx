@@ -17,7 +17,9 @@ import {
   useTradeExceptionsQuery,
   type TradeExceptionRow,
 } from "@/lib/store/api/endpoints/tradeApi";
+import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
+import EditContractModal from "./EditContractModal";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
@@ -180,11 +182,22 @@ function ExceptionList({
   );
 }
 
-function ContractRow({ contract }: { contract: SalaryContract }) {
+function ContractRow({
+  contract,
+  onEdit,
+}: {
+  contract: SalaryContract;
+  /** Null when the viewer cannot change contracts. */
+  onEdit: (() => void) | null;
+}) {
   const tag = seasonTag(contract);
 
   return (
-    <tr>
+    <tr
+      onClick={onEdit ?? undefined}
+      className={onEdit ? "cursor-pointer transition hover:bg-brand-soft/50" : undefined}
+      title={onEdit ? `Edit ${contract.name}&apos;s contract` : undefined}
+    >
       <td className="px-4 py-2.5">
         <p className="flex items-center gap-1.5 font-medium text-brand-dark">
           {contract.name}
@@ -232,11 +245,13 @@ function TeamPanel({
   cap,
   hardCap,
   exceptions,
+  onEditContract,
 }: {
   team: SalaryTeam;
   cap: SalaryCap;
   hardCap?: TeamHardCap;
   exceptions: TradeExceptionRow[];
+  onEditContract: ((contract: SalaryContract) => void) | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -352,7 +367,11 @@ function TeamPanel({
                 </thead>
                 <tbody className="divide-y divide-brand-border">
                   {team.contracts.map((contract) => (
-                    <ContractRow key={contract.id} contract={contract} />
+                    <ContractRow
+                      key={contract.id}
+                      contract={contract}
+                      onEdit={onEditContract ? () => onEditContract(contract) : null}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -425,6 +444,10 @@ function TeamPanel({
 export default function SalaryManagementPage() {
   const activeLeague = useAppSelector((s) => s.activeLeague.current);
   const leagueId = activeLeague?.id;
+  const canEdit = canManageLeague(activeLeague);
+
+  // Which contract the edit modal is open on.
+  const [editing, setEditing] = useState<SalaryContract | null>(null);
 
   const { data, isLoading } = useLeagueSalariesQuery(
     { leagueId: leagueId as number },
@@ -585,10 +608,19 @@ export default function SalaryManagementPage() {
                 cap={cap}
                 hardCap={hardCapByTeamId.get(team.id)}
                 exceptions={exceptionsByTeamId.get(team.id) ?? []}
+                onEditContract={canEdit ? setEditing : null}
               />
             ))
           : null}
       </div>
+
+      {leagueId ? (
+        <EditContractModal
+          leagueId={leagueId}
+          contract={editing}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
     </div>
   );
 }
