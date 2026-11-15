@@ -22,7 +22,8 @@ export default function OfferHistoryTab({
 }: {
   offers: Offer[];
   seasonStartYear: number;
-  onWithdraw: (offer: Offer) => void;
+  /** Null on a read-only list, such as the record of who has signed. */
+  onWithdraw: ((offer: Offer) => void) | null;
 }) {
   if (offers.length === 0) {
     return (
@@ -84,7 +85,7 @@ export default function OfferHistoryTab({
               </p>
             ) : null}
 
-            {offer.status === "pending" ? (
+            {offer.status === "pending" && onWithdraw ? (
               <div className="flex justify-end border-t border-brand-border px-4 py-2.5">
                 <button
                   type="button"
