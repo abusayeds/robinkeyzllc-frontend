@@ -1,18 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FiAlertTriangle, FiArrowRight } from "react-icons/fi";
+import { FiAlertTriangle } from "react-icons/fi";
 import {
   TRADE_STATUS_LABEL,
   TRADE_STATUS_TONE,
   useLeagueTradesQuery,
   useRespondToTradeMutation,
+  useTradeQuery,
   useWithdrawTradeMutation,
   type Trade,
+  type TradeAsset,
 } from "@/lib/store/api/endpoints/tradeApi";
-import TradeDetail from "@/components/commissioner/TradeDetail";
+import TeamLogo from "@/components/ui/TeamLogo";
+import TradeDetailsModal from "./TradeDetailsModal";
 
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -20,6 +23,30 @@ const errorText = (error: unknown, fallback: string) => {
 };
 
 const OPEN: Trade["status"][] = ["proposed", "awaitingApproval"];
+
+const SCOPES = ["Sent", "Received"] as const;
+type Scope = (typeof SCOPES)[number];
+
+const dated = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+const nameOf = (asset: TradeAsset) =>
+  asset.player?.name ?? asset.pick?.label ?? asset.exception?.label ?? "Asset";
+
+function StatTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-brand-border bg-white p-3 shadow-card">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-muted">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-bold text-brand-dark">{value}</p>
+    </div>
+  );
+}
 
 export default function PendingTradesTab({
   leagueId,
@@ -38,18 +65,38 @@ export default function PendingTradesTab({
   const [respond, { isLoading: responding }] = useRespondToTradeMutation();
   const [withdraw, { isLoading: withdrawing }] = useWithdrawTradeMutation();
 
-  const [open, setOpen] = useState<Trade | null>(null);
+  // Only the id is held: the detail is read fresh, so the panel it opens is
+  // judged against today's rosters rather than the row in this list.
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [scope, setScope] = useState<Scope>("Sent");
   const [error, setError] = useState<string | null>(null);
 
   const busy = responding || withdrawing;
 
-  const { live, settled } = useMemo(
-    () => ({
-      live: trades.filter((trade) => OPEN.includes(trade.status)),
-      settled: trades.filter((trade) => !OPEN.includes(trade.status)),
-    }),
-    [trades],
+  const { data: detail } = useTradeQuery(
+    { leagueId, tradeId: openId as number },
+    { skip: openId === null },
   );
+
+  const { sent, received, awaiting, declined } = useMemo(() => {
+    const mineFirst = trades.filter((trade) => trade.proposedBy?.id === userId);
+    const theirs = trades.filter((trade) => trade.proposedBy?.id !== userId);
+    return {
+      sent: mineFirst,
+      received: theirs,
+      awaiting: theirs.filter(
+        (trade) =>
+          trade.status === "proposed" &&
+          trade.teams.find((side) => side.teamId === myTeamId)?.response ===
+            "pending",
+      ),
+      declined: trades.filter(
+        (trade) => trade.status === "declined" || trade.status === "rejected",
+      ),
+    };
+  }, [trades, userId, myTeamId]);
+
+  const list = scope === "Sent" ? sent : received;
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setError(null);
@@ -70,127 +117,101 @@ export default function PendingTradesTab({
 
   const card = (trade: Trade) => {
     const mine = trade.teams.find((side) => side.teamId === myTeamId);
+    const partners = trade.teams.filter((side) => side.teamId !== myTeamId);
+    const partner = partners[0];
     const waitingOnMe =
       trade.status === "proposed" && mine?.response === "pending";
     const iProposed = trade.proposedBy?.id === userId;
 
+    const sending = trade.assets.filter(
+      (asset) => asset.fromTeamId === myTeamId,
+    );
+    const receiving = trade.assets.filter(
+      (asset) => asset.toTeamId === myTeamId,
+    );
+
     return (
       <div
         key={trade.id}
-        className="rounded-xl border border-brand-border bg-white shadow-card"
+        className="rounded-xl border border-brand-border bg-white p-4 shadow-card"
       >
-        <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-brand-dark">
-              {trade.teams.map((side) => side.team.abbr).join(" · ")}
-            </p>
-            <p className="text-[11px] text-brand-muted">
-              {trade.assets.length} asset{trade.assets.length === 1 ? "" : "s"}
-              {trade.proposedBy ? ` · ${trade.proposedBy.name}` : ""}
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <TeamLogo
+              name={partner?.team.name ?? ""}
+              src={partner?.team.logo ?? null}
+              className="h-8 w-8 shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-brand-dark">
+                {iProposed ? "To" : "From"}{" "}
+                {partners.map((side) => side.team.name).join(", ")}
+              </p>
+              <p className="text-xs text-brand-muted">
+                {dated(trade.createdAt)}
+              </p>
+            </div>
           </div>
-          <span
-            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${TRADE_STATUS_TONE[trade.status]}`}
-          >
-            {TRADE_STATUS_LABEL[trade.status]}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            {waitingOnMe ? (
+              <span className="rounded-full bg-brand-cta/15 px-2 py-0.5 text-[10px] font-bold text-brand-cta-dark">
+                New Offer
+              </span>
+            ) : null}
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${TRADE_STATUS_TONE[trade.status]}`}
+            >
+              {TRADE_STATUS_LABEL[trade.status]}
+            </span>
+          </div>
         </div>
 
-        <ul className="space-y-1 border-y border-brand-border px-4 py-2.5">
-          {trade.assets.map((asset) => {
-            const from = trade.teams.find((s) => s.teamId === asset.fromTeamId);
-            const to = trade.teams.find((s) => s.teamId === asset.toTeamId);
-            return (
-              <li
-                key={asset.id}
-                className="flex items-center gap-2 text-xs text-brand-dark"
-              >
-                <span className="font-semibold text-brand-muted">
-                  {from?.team.abbr}
-                </span>
-                <FiArrowRight className="h-3 w-3 text-brand-muted" />
-                <span className="font-semibold text-brand-muted">
-                  {to?.team.abbr}
-                </span>
-                <span>
-                  {asset.player?.name ??
-                    asset.pick?.label ??
-                    asset.exception?.label}
-                </span>
-                {asset.kind === "player" ? (
-                  <span className="ml-auto text-brand-muted">
-                    {money(asset.salary)}
-                  </span>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+          <div className="rounded-lg bg-brand-soft/50 p-2.5">
+            <p className="font-bold text-red-500">YOU SEND</p>
+            <p className="mt-0.5 text-brand-dark">
+              {sending.length === 0
+                ? "Nothing"
+                : sending.map(nameOf).join(", ")}
+            </p>
+            <p className="mt-1 text-brand-muted">
+              {money(mine?.outgoing ?? 0)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-brand-soft/50 p-2.5">
+            <p className="font-bold text-brand-cta-dark">YOU RECEIVE</p>
+            <p className="mt-0.5 text-brand-dark">
+              {receiving.length === 0
+                ? "Nothing"
+                : receiving.map(nameOf).join(", ")}
+            </p>
+            <p className="mt-1 text-brand-muted">
+              {money(mine?.incoming ?? 0)}
+            </p>
+          </div>
+        </div>
 
-        {mine ? (
-          <p className="px-4 py-2 text-[11px] text-brand-muted">
-            Your books: out {money(mine.outgoing)}, in {money(mine.incoming)},{" "}
-            <span
-              className={
-                mine.net > 0
-                  ? "font-semibold text-red-500"
-                  : mine.net < 0
-                    ? "font-semibold text-brand-cta-dark"
-                    : ""
-              }
-            >
-              {mine.net > 0 ? "+" : ""}
-              {money(mine.net)} net
-            </span>
+        {trade.message ? (
+          <p className="mt-2 text-xs italic text-brand-muted">
+            “{trade.message}”
           </p>
         ) : null}
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-brand-border px-4 py-2.5">
+        {trade.rejectedReason ? (
+          <p className="mt-2 text-xs text-red-600">{trade.rejectedReason}</p>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setOpen(trade)}
-            className="text-xs font-semibold text-brand-cta-dark hover:underline"
+            onClick={() => setOpenId(trade.id)}
+            className="rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:bg-brand-soft"
           >
-            Details
+            View Details
           </button>
-
-          {iProposed && OPEN.includes(trade.status) ? (
-            <button
-              type="button"
-              onClick={() =>
-                void run(
-                  () => withdraw({ leagueId, tradeId: trade.id }).unwrap(),
-                  "That trade could not be withdrawn.",
-                )
-              }
-              disabled={busy}
-              className="rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-muted transition hover:bg-brand-soft disabled:opacity-50"
-            >
-              Withdraw
-            </button>
-          ) : null}
 
           {waitingOnMe ? (
             <>
-              <button
-                type="button"
-                onClick={() =>
-                  void run(
-                    () =>
-                      respond({
-                        leagueId,
-                        tradeId: trade.id,
-                        teamId: myTeamId,
-                        accept: false,
-                      }).unwrap(),
-                    "That trade could not be declined.",
-                  )
-                }
-                disabled={busy}
-                className="rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-muted transition hover:bg-brand-soft disabled:opacity-50"
-              >
-                Decline
-              </button>
               <button
                 type="button"
                 onClick={() =>
@@ -210,7 +231,42 @@ export default function PendingTradesTab({
               >
                 Accept
               </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void run(
+                    () =>
+                      respond({
+                        leagueId,
+                        tradeId: trade.id,
+                        teamId: myTeamId,
+                        accept: false,
+                      }).unwrap(),
+                    "That trade could not be declined.",
+                  )
+                }
+                disabled={busy}
+                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                Decline
+              </button>
             </>
+          ) : null}
+
+          {iProposed && OPEN.includes(trade.status) ? (
+            <button
+              type="button"
+              onClick={() =>
+                void run(
+                  () => withdraw({ leagueId, tradeId: trade.id }).unwrap(),
+                  "That trade could not be withdrawn.",
+                )
+              }
+              disabled={busy}
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
           ) : null}
         </div>
       </div>
@@ -226,42 +282,103 @@ export default function PendingTradesTab({
         </div>
       ) : null}
 
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Sent Trades" value={sent.length} />
+        <StatTile label="Received" value={received.length} />
+        <StatTile label="Awaiting You" value={awaiting.length} />
+        <StatTile label="Declined" value={declined.length} />
+      </div>
+
+      <div className="flex justify-end">
+        <div className="flex rounded-lg border border-brand-border p-0.5">
+          {SCOPES.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setScope(item)}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+                scope === item
+                  ? "bg-brand-cta text-white"
+                  : "text-brand-muted hover:text-brand-dark"
+              }`}
+            >
+              {item} Trades ({item === "Sent" ? sent.length : received.length})
+            </button>
+          ))}
+        </div>
+      </div>
+
       {isLoading ? <p className="text-sm text-brand-muted">Loading…</p> : null}
 
-      {!isLoading && trades.length === 0 ? (
+      {!isLoading && list.length === 0 ? (
         <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
           <p className="text-sm font-semibold text-brand-dark">
-            No trades yet.
+            No {scope.toLowerCase()} trades.
           </p>
           <p className="mt-1 text-sm text-brand-muted">
-            Build one on the other tab, or wait for somebody to offer.
+            {scope === "Sent"
+              ? "Build one on the Build Trade tab."
+              : "Nobody has offered you a trade yet."}
           </p>
         </div>
-      ) : null}
+      ) : (
+        <div className="space-y-3">{list.map(card)}</div>
+      )}
 
-      {live.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold text-brand-dark">Open</h2>
-          {live.map(card)}
-        </section>
-      ) : null}
-
-      {settled.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold text-brand-dark">Settled</h2>
-          {settled.map(card)}
-        </section>
-      ) : null}
-
-      {/* The commissioner's approve and reject buttons never show here: the
-          detail hides them unless the trade is awaiting approval, and only a
-          commissioner can reach those routes anyway. */}
-      <TradeDetail
-        trade={open}
+      {/* No approve or reject here: only a commissioner can reach those
+          routes, and their own page has them. */}
+      <TradeDetailsModal
+        trade={detail ?? null}
+        evaluation={detail?.evaluation ?? null}
+        myTeamId={myTeamId}
         busy={busy}
-        onClose={() => setOpen(null)}
-        onApprove={() => undefined}
-        onReject={() => undefined}
+        canRespond={
+          detail
+            ? detail.status === "proposed" &&
+              detail.teams.find((side) => side.teamId === myTeamId)
+                ?.response === "pending"
+            : false
+        }
+        canWithdraw={
+          detail
+            ? detail.proposedBy?.id === userId &&
+              OPEN.includes(detail.status)
+            : false
+        }
+        onClose={() => setOpenId(null)}
+        onAccept={() => {
+          if (!detail) return;
+          void run(
+            () =>
+              respond({
+                leagueId,
+                tradeId: detail.id,
+                teamId: myTeamId,
+                accept: true,
+              }).unwrap(),
+            "That trade could not be accepted.",
+          ).then(() => setOpenId(null));
+        }}
+        onDecline={() => {
+          if (!detail) return;
+          void run(
+            () =>
+              respond({
+                leagueId,
+                tradeId: detail.id,
+                teamId: myTeamId,
+                accept: false,
+              }).unwrap(),
+            "That trade could not be declined.",
+          ).then(() => setOpenId(null));
+        }}
+        onWithdraw={() => {
+          if (!detail) return;
+          void run(
+            () => withdraw({ leagueId, tradeId: detail.id }).unwrap(),
+            "That trade could not be withdrawn.",
+          ).then(() => setOpenId(null));
+        }}
       />
     </div>
   );

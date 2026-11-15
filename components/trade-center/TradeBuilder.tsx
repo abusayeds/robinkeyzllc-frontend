@@ -1,69 +1,204 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FiAlertTriangle, FiArrowRight, FiPlus } from "react-icons/fi";
-import {
-  useProposeTradeMutation,
-  type ProposeTradeInput,
-} from "@/lib/store/api/endpoints/tradeApi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FiCheckCircle, FiPlus, FiRefreshCw } from "react-icons/fi";
+import { useTeamRosterQuery } from "@/lib/store/api/endpoints/rosterApi";
+import { useLeagueStandingsQuery } from "@/lib/store/api/endpoints/standingsApi";
 import type { Team } from "@/lib/store/api/endpoints/teamApi";
-import TeamPanel, { type PickedAsset } from "./TeamPanel";
+import {
+  useEvaluateTradeMutation,
+  useProposeTradeMutation,
+  type EvaluateTradeInput,
+  type ProposeTradeInput,
+  type TradeEvaluation,
+} from "@/lib/store/api/endpoints/tradeApi";
+import AddAssetModal from "./AddAssetModal";
+import AddTeamModal from "./AddTeamModal";
+import ConfirmTradeModal from "./ConfirmTradeModal";
+import TeamPanel, {
+  assetKey,
+  type PickedAsset,
+  type ProtectionTerms,
+  type TeamCard,
+} from "./TeamPanel";
+import TradeValidation from "./TradeValidation";
 
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
   return message ?? fallback;
 };
 
+const ordinal = (place: number) => {
+  const mod100 = place % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
+  const suffix = ["th", "st", "nd", "rd"][place % 10] ?? "th";
+  return `${place}${suffix}`;
+};
+
+/** How many teams one deal may involve, matching the evaluate endpoint's cap. */
+const MAX_TEAMS = 4;
+
 export default function TradeBuilder({
   leagueId,
   teams,
   myTeamId,
+  opponentId,
+  preloadLeaguePlayerId,
   onProposed,
 }: {
   leagueId: number;
   teams: Team[];
   myTeamId: number | null;
+  /** Set when the trade block sent the user here to deal with one team. */
+  opponentId?: number | null;
+  /**
+   * A player the Trade Finder asked for, put in on the way to this team's
+   * own card so the deal is already started.
+   */
+  preloadLeaguePlayerId?: number | null;
   onProposed: () => void;
 }) {
+  // On entry the builder holds the user's own team and nothing else: the
+  // trade partner is a choice, and picking one for them meant every trade
+  // started against whichever team happened to be first in the list. A team
+  // arriving from the trade block is a choice already made, so that one is
+  // loaded.
   const [teamIds, setTeamIds] = useState<number[]>(() => {
     const first = myTeamId ?? teams[0]?.id;
-    const second = teams.find((team) => team.id !== first)?.id;
-    return [first, second].filter((id): id is number => Boolean(id));
+    const ids = [first, opponentId && opponentId !== first ? opponentId : null];
+    return ids.filter((id): id is number => Boolean(id));
   });
 
   const [picked, setPicked] = useState<PickedAsset[]>([]);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [addAssetFor, setAddAssetFor] = useState<number | null>(null);
+  const [addingTeam, setAddingTeam] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [propose, { isLoading }] = useProposeTradeMutation();
+  const [evaluation, setEvaluation] = useState<TradeEvaluation | null>(null);
+  const [evaluateError, setEvaluateError] = useState<string | null>(null);
+
+  const [evaluate, { isLoading: evaluating }] = useEvaluateTradeMutation();
+  const [propose, { isLoading: proposing }] = useProposeTradeMutation();
+
+  // Records come from the standings, which is also where the league's own
+  // ordering lives — a card should not invent its own idea of who is first.
+  const { data: standings } = useLeagueStandingsQuery({ leagueId });
+
+  const placeOf = useMemo(() => {
+    const rows = standings?.standings ?? [];
+    const map = new Map<number, { record: string; place: string }>();
+    rows.forEach((row, index) => {
+      map.set(row.id, {
+        record: `${row.w}-${row.l}${row.t > 0 ? `-${row.t}` : ""}`,
+        place: ordinal(index + 1),
+      });
+    });
+    return map;
+  }, [standings]);
+
+  const cardOf = useCallback(
+    (teamId: number): TeamCard | null => {
+      const team = teams.find((row) => row.id === teamId);
+      if (!team) return null;
+      return {
+        id: team.id,
+        name: team.name,
+        abbr: team.abbr,
+        logo: team.logo,
+      };
+    },
+    [teams],
+  );
+
+  const inTrade = useMemo(
+    () =>
+      teamIds
+        .map(cardOf)
+        .filter((card): card is TeamCard => card !== null),
+    [teamIds, cardOf],
+  );
 
   const available = useMemo(
     () => teams.filter((team) => !teamIds.includes(team.id)),
     [teams, teamIds],
   );
 
-  const toggle = (asset: PickedAsset) => {
+  const toggle = (asset: PickedAsset) =>
     setPicked((prev) => {
-      const key = (a: PickedAsset) =>
-        a.kind === "player"
-          ? `p${a.leaguePlayerId}`
-          : a.kind === "draftPick"
-            ? `d${a.draftPickId}`
-            : `e${a.tradeExceptionId}`;
-      const exists = prev.some((a) => key(a) === key(asset));
+      const exists = prev.some((other) => assetKey(other) === assetKey(asset));
       return exists
-        ? prev.filter((a) => key(a) !== key(asset))
+        ? prev.filter((other) => assetKey(other) !== assetKey(asset))
         : [...prev, asset];
     });
-  };
 
-  const addTeam = (teamId: number) => setTeamIds((prev) => [...prev, teamId]);
+  const removeAsset = (asset: PickedAsset) =>
+    setPicked((prev) =>
+      prev.filter((other) => assetKey(other) !== assetKey(asset)),
+    );
+
+  const retarget = (asset: PickedAsset, toTeamId: number) =>
+    setPicked((prev) =>
+      prev.map((other) =>
+        assetKey(other) === assetKey(asset) ? { ...other, toTeamId } : other,
+      ),
+    );
+
+  // The Trade Finder's player, added once the opponent's roster is in. Done
+  // here rather than in the URL handler because the salary and the position
+  // come from the roster, and a card without them reads as an empty row.
+  const { data: opponentRoster } = useTeamRosterQuery(
+    { leagueId, teamId: (opponentId ?? 0) as number },
+    { skip: !opponentId || !preloadLeaguePlayerId },
+  );
+
+  const preloaded = useRef(false);
+  useEffect(() => {
+    if (preloaded.current || !preloadLeaguePlayerId || !opponentId) return;
+    const player = (opponentRoster?.players ?? []).find(
+      (row) => row.id === preloadLeaguePlayerId,
+    );
+    if (!player) return;
+
+    preloaded.current = true;
+    setPicked((prev) =>
+      prev.some((asset) => asset.leaguePlayerId === player.id)
+        ? prev
+        : [
+            ...prev,
+            {
+              kind: "player",
+              fromTeamId: opponentId,
+              toTeamId: myTeamId ?? null,
+              leaguePlayerId: player.id,
+              label: player.name,
+              salary: player.capHit ?? 0,
+              sub: player.position ?? undefined,
+            },
+          ],
+    );
+  }, [opponentRoster, preloadLeaguePlayerId, opponentId, myTeamId]);
+
+  const protect = (asset: PickedAsset, terms: ProtectionTerms) =>
+    setPicked((prev) =>
+      prev.map((other) =>
+        assetKey(other) === assetKey(asset) ? { ...other, ...terms } : other,
+      ),
+    );
+
+  const addTeam = (teamId: number) => {
+    setTeamIds((prev) =>
+      prev.includes(teamId) || prev.length >= MAX_TEAMS ? prev : [...prev, teamId],
+    );
+    setAddingTeam(false);
+  };
 
   const removeTeam = (teamId: number) => {
     setTeamIds((prev) => prev.filter((id) => id !== teamId));
-    // Anything that was going to or from that team no longer has two ends.
+    // Anything going to or from that team no longer has two ends.
     setPicked((prev) =>
       prev.filter(
         (asset) => asset.fromTeamId !== teamId && asset.toTeamId !== teamId,
@@ -71,32 +206,76 @@ export default function TradeBuilder({
     );
   };
 
-  /** Where an asset is headed, changeable once a third team is involved. */
-  const retarget = (asset: PickedAsset, toTeamId: number) =>
-    setPicked((prev) =>
-      prev.map((a) =>
-        a.leaguePlayerId === asset.leaguePlayerId &&
-        a.tradeExceptionId === asset.tradeExceptionId
-          ? { ...a, toTeamId }
-          : a,
-      ),
-    );
+  const clearTrade = () => {
+    setPicked([]);
+    setMessage("");
+    setSubmitError(null);
+  };
 
-  const everyTeamSends = teamIds.every((id) =>
-    picked.some((asset) => asset.fromTeamId === id),
+  // Above two teams an asset starts with no destination, so the owner has to
+  // say where it goes. Until then it cannot be judged or sent.
+  const allRouted = picked.every((asset) => asset.toTeamId !== null);
+
+  const request: EvaluateTradeInput = useMemo(
+    () => ({
+      teamIds,
+      assets: picked
+        .filter(
+          (asset): asset is PickedAsset & { toTeamId: number } =>
+            asset.toTeamId !== null,
+        )
+        .map((asset) => ({
+          kind: asset.kind,
+          fromTeamId: asset.fromTeamId,
+          toTeamId: asset.toTeamId,
+          leaguePlayerId: asset.leaguePlayerId,
+          tradeExceptionId: asset.tradeExceptionId,
+          draftPickId: asset.draftPickId,
+          // Rules 12.5-12.7 — only ever set on a pick, and only once the
+          // owner has chosen a cover.
+          protectedTopN: asset.protectedTopN ?? undefined,
+          protectionOutcome: asset.protectionOutcome ?? undefined,
+          protectionFinalYear: asset.protectionFinalYear ?? undefined,
+          protectionNote: asset.protectionNote ?? undefined,
+        })),
+    }),
+    [teamIds, picked],
   );
 
+  const runEvaluate = useCallback(
+    async (input: EvaluateTradeInput) => {
+      if (input.teamIds.length < 2) {
+        setEvaluation(null);
+        return;
+      }
+      try {
+        setEvaluateError(null);
+        setEvaluation(await evaluate({ leagueId, trade: input }).unwrap());
+      } catch (e) {
+        setEvaluation(null);
+        setEvaluateError(errorText(e, "That trade could not be checked."));
+      }
+    },
+    [evaluate, leagueId],
+  );
+
+  // Asked again on every change, a short wait after the last one: dragging a
+  // destination select through four teams should cost one request, not four.
+  const fingerprint = JSON.stringify(request);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runEvaluate(JSON.parse(fingerprint) as EvaluateTradeInput);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fingerprint, runEvaluate]);
+
+  const evaluationFor = (teamId: number) =>
+    evaluation?.teams.find((row) => row.teamId === teamId) ?? null;
+
   const submit = async () => {
-    setError(null);
+    setSubmitError(null);
     const trade: ProposeTradeInput = {
-      assets: picked.map((asset) => ({
-        kind: asset.kind,
-        fromTeamId: asset.fromTeamId,
-        toTeamId: asset.toTeamId,
-        leaguePlayerId: asset.leaguePlayerId,
-        tradeExceptionId: asset.tradeExceptionId,
-        draftPickId: asset.draftPickId,
-      })),
+      assets: request.assets,
       message: message.trim() || undefined,
     };
 
@@ -104,165 +283,207 @@ export default function TradeBuilder({
       await propose({ leagueId, trade }).unwrap();
       setPicked([]);
       setMessage("");
+      setConfirming(false);
       onProposed();
     } catch (e) {
-      setError(errorText(e, "That trade could not be proposed."));
+      setSubmitError(errorText(e, "That trade could not be proposed."));
     }
   };
 
-  const teamName = (id: number) =>
-    teams.find((team) => team.id === id)?.abbr ?? "—";
+  const addAssetTeam = addAssetFor === null ? null : cardOf(addAssetFor);
 
   return (
     <div className="space-y-4">
-      {error ? (
-        <div className="flex items-start gap-2 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">
-          <FiAlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setAddingTeam(true)}
+          disabled={available.length === 0 || teamIds.length >= MAX_TEAMS}
+          className="flex items-center gap-1.5 rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <FiPlus className="h-3.5 w-3.5" />
+          Add Team
+        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={clearTrade}
+            disabled={picked.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FiRefreshCw className="h-3.5 w-3.5" />
+            Clear Trade
+          </button>
+          <button
+            type="button"
+            onClick={() => void runEvaluate(request)}
+            disabled={evaluating}
+            className="flex items-center gap-1.5 rounded-lg border border-brand-border px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:bg-brand-soft disabled:opacity-50"
+          >
+            <FiCheckCircle
+              className={`h-3.5 w-3.5 ${evaluating ? "animate-pulse" : ""}`}
+            />
+            Evaluate Trade
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSubmitError(null);
+              setConfirming(true);
+            }}
+            // An illegal trade cannot be submitted at all: it used to be
+            // recorded anyway for the commissioner to read, which left owners
+            // waiting on an answer the rules had already given.
+            disabled={
+              picked.length === 0 ||
+              !allRouted ||
+              proposing ||
+              evaluation === null ||
+              !evaluation.isLegal
+            }
+            title={
+              evaluation && !evaluation.isLegal
+                ? "This trade breaks a rule. Fix the issues above first."
+                : undefined
+            }
+            className="rounded-lg bg-brand-cta px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-cta-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Submit Offer
+          </button>
+        </div>
+      </div>
+
+      {inTrade.length < 2 ? (
+        <div className="rounded-lg bg-brand-cta/10 px-4 py-2 text-sm font-medium text-brand-cta-dark">
+          Pick a trade partner to start. Use Add Team above.
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {teamIds.map((id) => {
-          const team = teams.find((t) => t.id === id);
-          if (!team) return null;
-          return (
-            <TeamPanel
-              key={id}
-              leagueId={leagueId}
-              teamId={id}
-              teamName={team.name}
-              teamColor={team.color}
-              otherTeamIds={teamIds.filter((other) => other !== id)}
-              picked={picked}
-              onToggle={toggle}
-              onRemove={() => removeTeam(id)}
-              canRemove={teamIds.length > 2}
-            />
-          );
-        })}
-
-        {available.length > 0 && teamIds.length < 4 ? (
-          <div className="flex items-center justify-center rounded-xl border border-dashed border-brand-border bg-white p-6">
-            <label className="w-full text-center">
-              <span className="mb-2 flex items-center justify-center gap-1.5 text-sm font-medium text-brand-muted">
-                <FiPlus className="h-4 w-4" />
-                Add a third team
-              </span>
-              <select
-                value=""
-                onChange={(e) => addTeam(Number(e.target.value))}
-                className="w-full rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-dark outline-none focus:border-brand-cta"
-              >
-                <option value="" disabled>
-                  Choose a team
-                </option>
-                {available.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="rounded-xl border border-brand-border bg-white shadow-card">
-        <div className="border-b border-brand-border px-4 py-3">
-          <p className="text-sm font-semibold text-brand-dark">
-            What this trade moves
-          </p>
-          <p className="text-[11px] text-brand-muted">
-            The league checks the rules when you send it, and records the result
-            either way.
-          </p>
+      {picked.length > 0 && !allRouted ? (
+        <div className="rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">
+          Choose a destination team for every asset before posting the trade.
         </div>
+      ) : null}
 
-        {picked.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-brand-muted">
-            Pick a player or an exception from a team above.
-          </p>
-        ) : (
-          <ul className="divide-y divide-brand-border">
-            {picked.map((asset) => (
-              <li
-                key={`${asset.kind}-${asset.leaguePlayerId ?? asset.tradeExceptionId}`}
-                className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
-              >
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="text-xs font-semibold text-brand-muted">
-                    {teamName(asset.fromTeamId)}
-                  </span>
-                  <FiArrowRight className="h-3 w-3 text-brand-muted" />
-                  {teamIds.length > 2 ? (
-                    <select
-                      value={asset.toTeamId}
-                      onChange={(e) => retarget(asset, Number(e.target.value))}
-                      className="rounded border border-brand-border px-1.5 py-0.5 text-xs text-brand-dark outline-none focus:border-brand-cta"
-                    >
-                      {teamIds
-                        .filter((id) => id !== asset.fromTeamId)
-                        .map((id) => (
-                          <option key={id} value={id}>
-                            {teamName(id)}
-                          </option>
-                        ))}
-                    </select>
-                  ) : (
-                    <span className="text-xs font-semibold text-brand-muted">
-                      {teamName(asset.toTeamId)}
-                    </span>
-                  )}
-                  <span className="font-medium text-brand-dark">
-                    {asset.label}
-                  </span>
-                </span>
-                <span className="flex items-center gap-3">
-                  <span className="text-xs text-brand-muted">
-                    {asset.kind === "tradeException"
-                      ? "exception"
-                      : asset.kind === "draftPick"
-                        ? "pick"
-                        : money(asset.salary)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => toggle(asset)}
-                    className="text-xs font-semibold text-brand-muted hover:text-red-500"
-                  >
-                    Remove
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="space-y-2 border-t border-brand-border px-4 py-3">
-          <input
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="A note to the other team (optional)"
-            className="w-full rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-dark outline-none focus:border-brand-cta"
+      <div
+        className={`grid gap-4 sm:grid-cols-2 ${
+          inTrade.length >= 4
+            ? "xl:grid-cols-4"
+            : inTrade.length === 3
+              ? "xl:grid-cols-3"
+              : ""
+        }`}
+      >
+        {inTrade.map((team) => (
+          <TeamPanel
+            key={team.id}
+            team={team}
+            isMine={team.id === myTeamId}
+            record={placeOf.get(team.id)?.record ?? null}
+            place={placeOf.get(team.id)?.place ?? null}
+            evaluation={evaluationFor(team.id)}
+            sending={picked.filter((asset) => asset.fromTeamId === team.id)}
+            receiving={picked.filter((asset) => asset.toTeamId === team.id)}
+            otherTeams={inTrade.filter((other) => other.id !== team.id)}
+            onAddAsset={() => setAddAssetFor(team.id)}
+            onRemoveAsset={removeAsset}
+            onRetarget={retarget}
+            onProtect={protect}
+            onRemoveTeam={() => removeTeam(team.id)}
+            canRemoveTeam={teamIds.length > 2}
           />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-brand-muted">
-              {!everyTeamSends && picked.length > 0
-                ? "Every team in a trade has to send something."
-                : "Your team accepts by proposing. The others have to reply."}
-            </p>
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={isLoading || picked.length === 0 || !everyTeamSends}
-              className="rounded-lg bg-brand-cta px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-cta-dark disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isLoading ? "Sending…" : "Propose trade"}
-            </button>
-          </div>
+        ))}
+      </div>
+
+      <TradeValidation
+        evaluation={evaluation}
+        busy={evaluating}
+        error={evaluateError}
+        unrouted={picked.filter((asset) => asset.toTeamId === null).length}
+      />
+
+      <div className="rounded-xl border border-brand-border bg-white p-4 shadow-card">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-muted">
+          Trade Summary
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {inTrade.map((team) => {
+            const row = evaluationFor(team.id);
+            const outgoing = row?.outgoing ?? 0;
+            const incoming = row?.incoming ?? 0;
+            const net = incoming - outgoing;
+            return (
+              <div
+                key={team.id}
+                className="rounded-lg border border-brand-border p-3"
+              >
+                <p className="truncate text-xs font-bold text-brand-dark">
+                  {team.name}
+                </p>
+                <dl className="mt-1.5 space-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-brand-muted">Outgoing</dt>
+                    <dd className="font-semibold text-red-500">
+                      -{money(outgoing)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-brand-muted">Incoming</dt>
+                    <dd className="font-semibold text-brand-cta-dark">
+                      +{money(incoming)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2 border-t border-brand-border pt-1">
+                    <dt className="font-semibold text-brand-dark">Net</dt>
+                    <dd
+                      className={`font-bold ${
+                        net > 0 ? "text-red-500" : "text-brand-cta-dark"
+                      }`}
+                    >
+                      {net >= 0 ? "+" : "-"}
+                      {money(Math.abs(net))}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            );
+          })}
         </div>
       </div>
+
+      {addAssetTeam ? (
+        <AddAssetModal
+          leagueId={leagueId}
+          team={addAssetTeam}
+          destinations={inTrade.filter((other) => other.id !== addAssetTeam.id)}
+          picked={picked}
+          onToggle={toggle}
+          onClose={() => setAddAssetFor(null)}
+        />
+      ) : null}
+
+      <AddTeamModal
+        open={addingTeam}
+        teams={available}
+        recordOf={(teamId) => placeOf.get(teamId)?.record ?? null}
+        onPick={addTeam}
+        onClose={() => setAddingTeam(false)}
+      />
+
+      <ConfirmTradeModal
+        open={confirming}
+        evaluation={evaluation}
+        recipients={inTrade
+          .filter((team) => team.id !== myTeamId)
+          .map((team) => team.name)}
+        message={message}
+        busy={proposing}
+        error={submitError}
+        onMessage={setMessage}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => void submit()}
+      />
     </div>
   );
 }

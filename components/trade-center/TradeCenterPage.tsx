@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useLeagueTeamsQuery } from "@/lib/store/api/endpoints/teamApi";
 import { useLeagueTradesQuery } from "@/lib/store/api/endpoints/tradeApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import PendingTradesTab from "./PendingTradesTab";
+import TradeBlockTab from "./TradeBlockTab";
 import TradeBuilder from "./TradeBuilder";
 
-const TABS = ["Build a trade", "My trades"] as const;
+const TABS = ["Build Trade", "Trade Block", "Pending Trades"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function TradeCenterPage() {
@@ -45,7 +47,25 @@ export default function TradeCenterPage() {
         "pending",
   ).length;
 
-  const [tab, setTab] = useState<Tab>("Build a trade");
+  const [tab, setTab] = useState<Tab>("Build Trade");
+
+  // Set from the trade block's "Propose Trade", so the builder opens with
+  // that team already across the table. Changing it remounts the builder,
+  // which is how its own team list is replaced.
+  const [opponent, setOpponent] = useState<number | null>(null);
+
+  // The Trade Finder sends a player and his team over in the URL, so its
+  // "Trade" button lands on a builder that already has the deal started
+  // rather than an empty one.
+  const params = useSearchParams();
+  const fromFinder = useMemo(() => {
+    const team = Number(params.get("team"));
+    const player = Number(params.get("player"));
+    return {
+      teamId: Number.isFinite(team) && team > 0 ? team : null,
+      leaguePlayerId: Number.isFinite(player) && player > 0 ? player : null,
+    };
+  }, [params]);
 
   if (!leagueId) {
     return (
@@ -60,11 +80,11 @@ export default function TradeCenterPage() {
       <div>
         <h1 className="text-xl font-bold text-brand-dark">Trade Center</h1>
         <p className="text-sm text-brand-muted">
-          Put a deal together, and answer the ones sent to you.
+          Build trades, manage your trade block, and track pending offers.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center border-b border-brand-border">
+      <div className="flex flex-wrap border-b border-brand-border">
         {TABS.map((item) => (
           <button
             key={item}
@@ -78,7 +98,7 @@ export default function TradeCenterPage() {
           >
             <span className="inline-flex items-center gap-1.5">
               {item}
-              {item === "My trades" && waiting > 0 ? (
+              {item === "Pending Trades" && waiting > 0 ? (
                 <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-cta px-1 text-[10px] font-bold text-white">
                   {waiting}
                 </span>
@@ -91,7 +111,7 @@ export default function TradeCenterPage() {
         ))}
       </div>
 
-      {tab === "Build a trade" ? (
+      {tab === "Build Trade" ? (
         teams.length < 2 ? (
           <div className="rounded-xl border border-brand-border bg-white p-10 text-center shadow-card">
             <p className="text-sm font-semibold text-brand-dark">
@@ -101,19 +121,37 @@ export default function TradeCenterPage() {
           </div>
         ) : (
           <TradeBuilder
+            key={opponent ?? fromFinder.teamId ?? "default"}
             leagueId={leagueId}
             teams={teams}
             myTeamId={myTeamId}
-            onProposed={() => setTab("My trades")}
+            opponentId={opponent ?? fromFinder.teamId}
+            preloadLeaguePlayerId={
+              opponent === null ? fromFinder.leaguePlayerId : null
+            }
+            onProposed={() => setTab("Pending Trades")}
           />
         )
-      ) : (
+      ) : null}
+
+      {tab === "Trade Block" ? (
+        <TradeBlockTab
+          leagueId={leagueId}
+          myTeamId={myTeamId}
+          onProposeTo={(teamId) => {
+            setOpponent(teamId);
+            setTab("Build Trade");
+          }}
+        />
+      ) : null}
+
+      {tab === "Pending Trades" ? (
         <PendingTradesTab
           leagueId={leagueId}
           myTeamId={myTeamId}
           userId={userId}
         />
-      )}
+      ) : null}
     </div>
   );
 }
