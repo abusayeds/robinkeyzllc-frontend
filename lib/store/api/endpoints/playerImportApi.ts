@@ -124,12 +124,23 @@ export const playerImportApi = baseApi.injectEndpoints({
 
     resolveImportRow: builder.mutation<
       ImportPreview,
-      { leagueId: number; batchId: number; rowId: number; playerId: number }
+      {
+        leagueId: number;
+        batchId: number;
+        rowId: number;
+        /** The player this row really meant. */
+        playerId?: number;
+        /**
+         * Creates a league-only player from the row's own name, for someone
+         * the NBA feed has never carried.
+         */
+        createPlayer?: boolean;
+      }
     >({
-      query: ({ leagueId, batchId, rowId, playerId }) => ({
+      query: ({ leagueId, batchId, rowId, playerId, createPlayer }) => ({
         url: `/leagues/${leagueId}/import/${batchId}/rows/${rowId}`,
         method: "PATCH",
-        body: { playerId },
+        body: createPlayer ? { createPlayer: true } : { playerId },
       }),
       transformResponse: (r: ApiResponse<ImportPreview>) => unwrap(r),
       invalidatesTags: (_result, _error, { leagueId }) => [
