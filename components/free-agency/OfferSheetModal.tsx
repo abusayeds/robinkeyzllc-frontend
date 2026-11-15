@@ -30,6 +30,33 @@ const SIGNED_VIA = [
   { value: "disabledPlayerException", label: "Disabled Player Exception" },
 ];
 
+/**
+ * The four terms the old sheet listed as checkboxes.
+ *
+ * Not checkboxes here: each of them is already decided by a field above —
+ * an option year is set on the contract, a partial guarantee by its type —
+ * so a second control saying the same thing could disagree with the first.
+ * They are explained instead.
+ */
+const TERM_NOTES: { label: string; note: string }[] = [
+  {
+    label: "Player Option",
+    note: "Set on the contract once it is signed, from the Contracts page.",
+  },
+  {
+    label: "Team Option",
+    note: "Also set on the contract, and only on a year after the first.",
+  },
+  {
+    label: "No Trade Clause",
+    note: "Not part of the V1 rules. The rule book does not define one.",
+  },
+  {
+    label: "Partial Guarantee",
+    note: "Choose Partially Guaranteed as the type and name each season below.",
+  },
+];
+
 export default function OfferSheetModal({
   player,
   team,
@@ -102,6 +129,41 @@ export default function OfferSheetModal({
 
   const total = offerTotal(rows);
 
+  /**
+   * Where the offer leaves the team.
+   *
+   * Only the first year moves this season's books, so that is what every
+   * line is measured against. A negative figure means the signing takes the
+   * team past that line, which is why it is coloured rather than relabelled.
+   */
+  const impact = useMemo(() => {
+    if (!team) return [];
+    const first = isTwoWay ? 0 : rows[0]?.salary ?? 0;
+    return [
+      { label: "Payroll now", value: team.committed, money: true },
+      { label: "Payroll if signed", value: team.committed + first, money: true },
+      {
+        label: "Cap space left",
+        value: (team.capSpace ?? 0) - first,
+        money: true,
+      },
+      {
+        label: "Roster if signed",
+        value: team.rosterCount + 1,
+        money: false,
+      },
+      ...(team.hardCapEnabled && team.hardCapThreshold !== null
+        ? [
+            {
+              label: "Under the hard cap by",
+              value: team.hardCapThreshold - (team.committed + first),
+              money: true,
+            },
+          ]
+        : []),
+    ];
+  }, [team, rows, isTwoWay]);
+
   // Shown while typing so the form can warn early. The server runs the same
   // rules again on submit and its answer is the one that counts.
   const warnings = useMemo(() => {
@@ -144,12 +206,12 @@ export default function OfferSheetModal({
       onMouseDown={onClose}
     >
       <div
-        className="my-8 w-full max-w-lg rounded-xl bg-white shadow-xl"
+        className="my-8 w-full max-w-3xl rounded-2xl bg-white shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-brand-border px-5 py-3.5">
+        <div className="flex items-start justify-between border-b border-brand-border px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-brand-dark">
+            <h2 className="text-sm font-bold text-brand-dark">
               {existing ? "Change your offer" : "Offer sheet"}
             </h2>
             <p className="text-xs text-brand-muted">
@@ -164,9 +226,10 @@ export default function OfferSheetModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-brand-muted transition hover:bg-brand-soft hover:text-brand-dark"
+            aria-label="Close"
+            className="rounded-lg p-1.5 text-brand-muted transition hover:bg-brand-soft hover:text-brand-dark"
           >
-            <FiX className="h-4 w-4" />
+            <FiX className="h-5 w-5" />
           </button>
         </div>
 
@@ -269,8 +332,12 @@ export default function OfferSheetModal({
             bird year{player.birdYears === 1 ? "" : "s"} and are not chosen here.
           </p>
 
-          <div className="rounded-lg border border-brand-border">
-            <table className="w-full text-sm">
+          <div>
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
+              Salary Breakdown
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-brand-border">
+            <table className="w-full min-w-[420px] text-sm">
               <thead className="bg-brand-soft/60 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
                 <tr>
                   <th className="px-3 py-2">Season</th>
@@ -303,7 +370,55 @@ export default function OfferSheetModal({
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
+
+          {/* The old sheet named these blocks, which is how an owner finds
+              the one they want in a long form. */}
+          {!isTwoWay ? (
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
+                Additional Terms
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {TERM_NOTES.map((term) => (
+                  <p
+                    key={term.label}
+                    className="rounded-lg border border-brand-border px-3 py-2 text-xs"
+                  >
+                    <span className="font-semibold text-brand-dark">
+                      {term.label}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-brand-muted">
+                      {term.note}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {team && !isTwoWay ? (
+            <div className="rounded-lg border border-brand-border p-3">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
+                Team Impact (If Signed)
+              </p>
+              <dl className="space-y-1 text-xs">
+                {impact.map((line) => (
+                  <div key={line.label} className="flex justify-between gap-2">
+                    <dt className="text-brand-muted">{line.label}</dt>
+                    <dd
+                      className={`font-semibold ${
+                        line.value < 0 ? "text-red-500" : "text-brand-dark"
+                      }`}
+                    >
+                      {line.money ? money(line.value) : String(line.value)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
 
           {/* Rule 10.1 — a partial guarantee is named season by season, so
               the inputs sit beside the salaries they are capped by. */}

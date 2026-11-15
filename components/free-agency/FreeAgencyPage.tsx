@@ -20,7 +20,7 @@ import OfferHistoryTab from "./OfferHistoryTab";
 import OfferSheetModal from "./OfferSheetModal";
 import WithdrawOfferModal from "./WithdrawOfferModal";
 
-const TABS = ["All Players", "My Offers"] as const;
+const TABS = ["All Players", "Signed Players", "Pending Offers"] as const;
 type Tab = (typeof TABS)[number];
 
 const TYPES = ["All Types", "UFA", "RFA"] as const;
@@ -82,13 +82,20 @@ export default function FreeAgencyPage() {
   );
   const pendingCount = myOffers.filter((o) => o.status === "pending").length;
 
+  // Everyone the league has signed out of free agency this season, not just
+  // this team: the tab is a league-wide record of who went where.
+  const signed = useMemo(
+    () => (board?.offers ?? []).filter((offer) => offer.status === "accepted"),
+    [board],
+  );
+
   const send = async (offer: OfferInput) => {
     if (!leagueId || !myTeamId) return;
     setError(null);
     try {
       await submitOffer({ leagueId, teamId: myTeamId, offer }).unwrap();
       setOfferFor(null);
-      setTab("My Offers");
+      setTab("Pending Offers");
     } catch (e) {
       setError(errorText(e, "That offer could not be sent."));
     }
@@ -155,7 +162,7 @@ export default function FreeAgencyPage() {
           >
             <span className="inline-flex items-center gap-1.5">
               {item}
-              {item === "My Offers" && pendingCount > 0 ? (
+              {item === "Pending Offers" && pendingCount > 0 ? (
                 <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-cta px-1 text-[10px] font-bold text-white">
                   {pendingCount}
                 </span>
@@ -226,7 +233,23 @@ export default function FreeAgencyPage() {
         </div>
       ) : null}
 
-      {tab === "My Offers" ? (
+      {tab === "Signed Players" ? (
+        signed.length === 0 ? (
+          <div className="rounded-xl border border-brand-border bg-white p-10 text-center text-sm text-brand-muted shadow-card">
+            No players signed this off-season yet.
+          </div>
+        ) : (
+          <OfferHistoryTab
+            offers={signed}
+            seasonStartYear={
+              pool?.seasonStartYear ?? board?.seasonStartYear ?? 0
+            }
+            onWithdraw={null}
+          />
+        )
+      ) : null}
+
+      {tab === "Pending Offers" ? (
         <OfferHistoryTab
           offers={myOffers}
           seasonStartYear={pool?.seasonStartYear ?? board?.seasonStartYear ?? 0}
