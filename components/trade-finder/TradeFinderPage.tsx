@@ -44,6 +44,18 @@ function Select({
 
 export default function TradeFinderPage() {
   const router = useRouter();
+
+  /**
+   * Opens the trade builder with this player and his team already in it.
+   * Dropping the user on an empty builder meant finding the same player
+   * twice.
+   */
+  const openBuilder = (player: FinderPlayer) => {
+    const params = new URLSearchParams();
+    if (player.team?.id) params.set("team", String(player.team.id));
+    params.set("player", String(player.id));
+    router.push(`/my-team/trade-center?${params.toString()}`);
+  };
   const activeLeague = useAppSelector((s) => s.activeLeague.current);
   const leagueId = activeLeague?.id;
 
@@ -229,8 +241,8 @@ export default function TradeFinderPage() {
                     player={player}
                     saved={savedIds.has(player.id)}
                     onToggleSave={() => toggleSave(player)}
-                    onOpenDetail={() => router.push("/my-team/trade-center")}
-                    onTrade={() => router.push("/my-team/trade-center")}
+                    onOpenDetail={() => openBuilder(player)}
+                    onTrade={() => openBuilder(player)}
                   />
                 ))}
               </div>
