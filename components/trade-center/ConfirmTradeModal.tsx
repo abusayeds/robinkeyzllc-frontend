@@ -132,7 +132,13 @@ export default function ConfirmTradeModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            // An illegal trade cannot be submitted from here either. The
+            // builder already keeps this modal shut for one, but the button
+            // that actually sends it should not depend on that being true.
+            disabled={busy || !legal}
+            title={
+              legal ? undefined : "This trade breaks a rule and cannot be sent."
+            }
             className="flex-1 rounded-lg bg-brand-cta px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-cta-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "Sending…" : "Submit"}
