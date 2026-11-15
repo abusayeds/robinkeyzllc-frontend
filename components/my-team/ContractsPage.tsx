@@ -9,8 +9,14 @@ import {
 } from "@/lib/store/api/endpoints/rosterApi";
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useAppSelector } from "@/lib/store/hooks";
+import { usePayrollOutlookQuery } from "@/lib/store/api/endpoints/salaryApi";
 import CapSummaryCards from "./CapSummaryCards";
 import ContractsTable from "./ContractsTable";
+import {
+  ContractBreakdownCard,
+  FutureOutlookCard,
+  RosterSummaryCard,
+} from "./ContractsSidebar";
 import ExtensionModal from "./ExtensionModal";
 import PlayerDetailModal from "./PlayerDetailModal";
 import { CONTRACTS_SUBNAV } from "./subnav";
@@ -54,6 +60,13 @@ export default function ContractsPage() {
   // another team's contracts is allowed and is read-only, so the column is
   // not drawn at all rather than drawn and refused.
   const isMyTeam = activeTeamId !== null && activeTeamId === myTeamId;
+
+  // The projection the Payroll Simulator draws, read here rather than
+  // recomputed so both pages cannot disagree about the same five seasons.
+  const { data: outlook } = usePayrollOutlookQuery(
+    { leagueId: leagueId as number, teamId: activeTeamId as number },
+    { skip: !leagueId || !activeTeamId },
+  );
 
   const seasons = useMemo(() => {
     if (!data) return [];
@@ -154,14 +167,37 @@ export default function ContractsPage() {
               </p>
             </div>
           ) : (
-            <ContractsTable
-              players={data.players}
-              seasons={seasons}
-              deadMoneyRows={data.deadMoneyRows}
-              capHoldRows={data.capHoldRows}
-              onView={(player) => setDetail(player.playerId)}
-              onExtend={isMyTeam ? setExtending : undefined}
-            />
+            // The table leads and the three summary cards sit beside it on a
+            // wide screen, stacking under it on a narrow one.
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_300px]">
+              <div className="min-w-0 xl:col-start-1 xl:row-span-3 xl:row-start-1">
+                <ContractsTable
+                  players={data.players}
+                  seasons={seasons}
+                  deadMoneyRows={data.deadMoneyRows}
+                  capHoldRows={data.capHoldRows}
+                  onView={(player) => setDetail(player.playerId)}
+                  onExtend={isMyTeam ? setExtending : undefined}
+                />
+              </div>
+              <div className="xl:col-start-2 xl:row-start-1">
+                <ContractBreakdownCard
+                  players={data.players}
+                  deadCap={data.cap.deadMoney}
+                  seasonStartYear={seasons[0] ?? 0}
+                />
+              </div>
+              <div className="xl:col-start-2 xl:row-start-2">
+                <RosterSummaryCard
+                  counts={data.counts}
+                  rosterMax={data.rules?.maxRosterSize ?? 0}
+                  maxTwoWay={data.rules?.maxTwoWay ?? 0}
+                />
+              </div>
+              <div className="xl:col-start-2 xl:row-start-3">
+                <FutureOutlookCard outlook={outlook ?? null} />
+              </div>
+            </div>
           )}
 
           <PlayerDetailModal

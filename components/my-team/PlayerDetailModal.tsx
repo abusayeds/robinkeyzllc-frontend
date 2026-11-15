@@ -295,8 +295,8 @@ export default function PlayerDetailModal({
                 )}
               </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
-                <div>
+              <div className="flex flex-col gap-5 md:grid md:grid-cols-2">
+                <div className="order-2 md:order-none">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
                     Contract Breakdown
                   </p>
@@ -346,9 +346,9 @@ export default function PlayerDetailModal({
                   )}
                 </div>
 
-                <div>
+                <div className="order-1 md:order-none">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
-                    Game Log (Last {data.gameLog.length || 5})
+                    Game Log (Last 5)
                   </p>
                   {data.gameLog.length === 0 ? (
                     <p className="text-xs text-brand-muted">

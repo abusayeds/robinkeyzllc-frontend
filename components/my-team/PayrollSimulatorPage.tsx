@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { FiPlus, FiRotateCcw, FiTrash2 } from "react-icons/fi";
+import { FiPlus, FiRotateCcw, FiSave, FiTrash2 } from "react-icons/fi";
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useTeamRosterQuery } from "@/lib/store/api/endpoints/rosterApi";
 import { usePayrollOutlookQuery } from "@/lib/store/api/endpoints/salaryApi";
@@ -10,8 +10,6 @@ import { useLeagueTeamsQuery } from "@/lib/store/api/endpoints/teamApi";
 import NumberField from "@/components/ui/NumberField";
 import { useAppSelector } from "@/lib/store/hooks";
 import { CONTRACTS_SUBNAV } from "./subnav";
-import TeamSelector from "./TeamSelector";
-import { useViewedTeam } from "./viewedTeam";
 
 const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
@@ -52,7 +50,9 @@ export default function PayrollSimulatorPage() {
   });
   const teams = useMemo(() => teamList?.teams ?? [], [teamList]);
 
-  const [activeTeamId, setViewTeamId] = useViewedTeam(myTeamId, teams);
+  // An owner simulates their own books and nobody else's: the selector here
+  // let them open another team's payroll, which the simulator was never for.
+  const activeTeamId = myTeamId;
 
   const { data: roster } = useTeamRosterQuery(
     { leagueId: leagueId as number, teamId: activeTeamId as number },
@@ -89,10 +89,42 @@ export default function PayrollSimulatorPage() {
   const [rows, setRows] = useState<ScenarioRow[]>([]);
   const [newName, setNewName] = useState("");
 
+  /**
+   * A scenario is a plan, not a record, so it is kept in this browser rather
+   * than on the server: nobody else should see it, and it must never be
+   * mistaken for a contract. It is dropped as soon as the real roster moves.
+   */
+  const scenarioKey = activeTeamId ? `avora:simulator:${activeTeamId}` : null;
+  const [saved, setSaved] = useState(false);
+
+  const saveScenario = () => {
+    if (!scenarioKey) return;
+    try {
+      window.localStorage.setItem(scenarioKey, JSON.stringify(rows));
+      setSaved(true);
+    } catch {
+      // A private window, or storage turned off. The scenario still works on
+      // screen; it just will not be here next time.
+    }
+  };
+
   // Reset the scenario whenever the real contracts change underneath it —
   // switching team, or an import landing. Editing on top of someone else's
   // roster would be worse than losing the edits.
-  useEffect(() => setRows(baseline), [baseline]);
+  useEffect(() => {
+    if (!scenarioKey) {
+      setRows(baseline);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(scenarioKey);
+      const parsed = stored ? (JSON.parse(stored) as ScenarioRow[]) : null;
+      setRows(Array.isArray(parsed) && parsed.length > 0 ? parsed : baseline);
+    } catch {
+      setRows(baseline);
+    }
+    setSaved(false);
+  }, [baseline, scenarioKey]);
 
   const dirty = useMemo(
     () => JSON.stringify(rows) !== JSON.stringify(baseline),
@@ -149,18 +181,11 @@ export default function PayrollSimulatorPage() {
             Payroll Simulator
           </h1>
           <p className="text-sm text-brand-muted">
-            Change a salary or add a signing and see what it does to the books.
-            Nothing here is saved.
+            Change a salary or add a signing and see what it does to the
+            books. Saving keeps the scenario for you alone — no contract is
+            touched.
           </p>
         </div>
-        {teams.length > 0 ? (
-          <TeamSelector
-            teams={teams}
-            value={activeTeamId}
-            onChange={setViewTeamId}
-            myTeamId={myTeamId}
-          />
-        ) : null}
       </div>
 
       <nav className="flex flex-wrap items-center gap-1 border-b border-brand-border">
@@ -367,7 +392,27 @@ export default function PayrollSimulatorPage() {
             {dirty ? (
               <button
                 type="button"
-                onClick={() => setRows(baseline)}
+                onClick={saveScenario}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-cta/40 bg-brand-cta/10 px-3 py-2 text-sm font-semibold text-brand-cta-dark transition hover:bg-brand-cta/15"
+              >
+                <FiSave className="h-4 w-4" />
+                {saved ? "Saved" : "Save"}
+              </button>
+            ) : null}
+            {dirty ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setRows(baseline);
+                  setSaved(false);
+                  if (scenarioKey) {
+                    try {
+                      window.localStorage.removeItem(scenarioKey);
+                    } catch {
+                      // Nothing to undo if it was never stored.
+                    }
+                  }
+                }}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border px-3 py-2 text-sm font-medium text-brand-muted transition hover:bg-brand-soft"
               >
                 <FiRotateCcw className="h-4 w-4" />
