@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { FiX } from "react-icons/fi";
 import type {
   MatchupTeam,
   ScheduleMatchup,
 } from "@/lib/store/api/endpoints/standingsApi";
 import TeamLogo from "@/components/ui/TeamLogo";
+import { useModalShell } from "@/lib/useModalShell";
 
 export default function SeasonScheduleModal({
   open,
@@ -21,20 +22,7 @@ export default function SeasonScheduleModal({
   schedule: ScheduleMatchup[];
   teams: Map<number, MatchupTeam>;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  useModalShell(open, onClose);
 
   const weeks = useMemo(() => {
     const map = new Map<number, ScheduleMatchup[]>();

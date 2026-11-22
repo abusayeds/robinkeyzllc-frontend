@@ -60,7 +60,8 @@ export default function AvoraHomePage() {
     [memberships],
   );
   const waitingLeagues = useMemo(
-    () => memberships.filter((league) => !league.team && !managesLeague(league)),
+    () =>
+      memberships.filter((league) => !league.team && !managesLeague(league)),
     [memberships],
   );
 
@@ -81,9 +82,7 @@ export default function AvoraHomePage() {
         await declineInvite(inviteId).unwrap();
       }
     } catch (err) {
-      setInviteError(
-        getApiErrorMessage(err, "Could not answer that invite."),
-      );
+      setInviteError(getApiErrorMessage(err, "Could not answer that invite."));
     }
   }
 
@@ -115,11 +114,16 @@ export default function AvoraHomePage() {
     router.push("/league-office");
   }
 
-  /** My Team — opens the franchise itself, as its owner. */
+  /**
+   * My Team — opens that league as its owner.
+   *
+   * Lands on the owner dashboard, not on /my-team: the dashboard is the page
+   * the owner view is built around, and the roster is one click from it.
+   */
   function enterTeam(league: ApiLeague) {
     openLeague(league);
     dispatch(setRole("owner"));
-    router.push("/my-team");
+    router.push("/dashboard");
   }
 
   return (

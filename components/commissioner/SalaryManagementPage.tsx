@@ -14,17 +14,30 @@ import {
   type TeamHardCap,
 } from "@/lib/store/api/endpoints/salaryApi";
 import {
+  useRetireTradeExceptionMutation,
   useTradeExceptionsQuery,
   type TradeExceptionRow,
 } from "@/lib/store/api/endpoints/tradeApi";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
+import CreateTradeExceptionModal from "./CreateTradeExceptionModal";
 import EditContractModal from "./EditContractModal";
 
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+/**
+ * A figure, or a dash.
+ *
+ * Null-safe on purpose: this is rendered straight into JSX, and a missing
+ * number used to throw on `.toLocaleString` and take the whole page down with
+ * an "Application error" rather than show one empty cell.
+ */
+const money = (value: number | null | undefined) =>
+  value === null || value === undefined
+    ? "—"
+    : `${Math.round(value).toLocaleString("en-US")}`;
 
 /** Compact for the wide cap table, where eight full figures do not fit. */
-const short = (value: number) => {
+const short = (value: number | null | undefined) => {
+  if (value === null || value === undefined) return "—";
   if (Math.abs(value) >= 1_000_000) {
     return `$${(value / 1_000_000).toFixed(1)}M`;
   }
@@ -125,15 +138,6 @@ function HardCapNote({ hardCap }: { hardCap: TeamHardCap }) {
           <dd>{money(hardCap.teamSalary)}</dd>
         </div>
         <div className="flex gap-1">
-          <dt className="font-semibold">Roster reserve</dt>
-          <dd>
-            {money(hardCap.reserve)}
-            {hardCap.openSpots > 0
-              ? ` · ${hardCap.openSpots} spot${hardCap.openSpots === 1 ? "" : "s"} at ${money(hardCap.rookieMinimum)}`
-              : ""}
-          </dd>
-        </div>
-        <div className="flex gap-1">
           <dt className="font-semibold">Roster</dt>
           <dd>
             {hardCap.rosterCount} of {hardCap.rosterMinimum} minimum
@@ -152,8 +156,11 @@ function HardCapNote({ hardCap }: { hardCap: TeamHardCap }) {
  */
 function ExceptionList({
   exceptions,
+  onRetire,
 }: {
   exceptions: TradeExceptionRow[];
+  /** Null when the viewer cannot change the league. */
+  onRetire: ((exceptionId: number) => void) | null;
 }) {
   return (
     <div className="border-t border-brand-border px-4 py-3">
@@ -164,16 +171,33 @@ function ExceptionList({
       </p>
       <ul className="mt-1.5 space-y-1">
         {exceptions.map((row) => (
-          <li key={row.id} className="flex items-center justify-between text-xs">
+          <li
+            key={row.id}
+            className="flex items-center justify-between text-xs"
+          >
             <span className="text-brand-dark">
               {row.label}
               <span className="ml-1.5 text-brand-muted">
                 expires {formatExpiry(row.expiresAt)}
               </span>
             </span>
-            <span className="text-brand-muted">
-              {money(row.remaining)}
-              {row.remaining !== row.amount ? ` of ${money(row.amount)}` : ""}
+            <span className="flex items-center gap-2">
+              <span className="text-brand-muted">
+                {money(row.remaining)}
+                {row.remaining !== row.amount ? ` of ${money(row.amount)}` : ""}
+              </span>
+              {onRetire ? (
+                <button
+                  type="button"
+                  onClick={() => onRetire(row.id)}
+                  // Deactivated, never deleted: a trade that used part of it
+                  // still points at this row.
+                  title="Retire this exception"
+                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-brand-muted transition hover:bg-red-50 hover:text-red-600"
+                >
+                  Retire
+                </button>
+              ) : null}
             </span>
           </li>
         ))}
@@ -195,7 +219,9 @@ function ContractRow({
   return (
     <tr
       onClick={onEdit ?? undefined}
-      className={onEdit ? "cursor-pointer transition hover:bg-brand-soft/50" : undefined}
+      className={
+        onEdit ? "cursor-pointer transition hover:bg-brand-soft/50" : undefined
+      }
       title={onEdit ? `Edit ${contract.name}&apos;s contract` : undefined}
     >
       <td className="px-4 py-2.5">
@@ -246,12 +272,14 @@ function TeamPanel({
   hardCap,
   exceptions,
   onEditContract,
+  onRetireException,
 }: {
   team: SalaryTeam;
   cap: SalaryCap;
   hardCap?: TeamHardCap;
   exceptions: TradeExceptionRow[];
   onEditContract: ((contract: SalaryContract) => void) | null;
+  onRetireException: ((exceptionId: number) => void) | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -370,7 +398,9 @@ function TeamPanel({
                     <ContractRow
                       key={contract.id}
                       contract={contract}
-                      onEdit={onEditContract ? () => onEditContract(contract) : null}
+                      onEdit={
+                        onEditContract ? () => onEditContract(contract) : null
+                      }
                     />
                   ))}
                 </tbody>
@@ -397,7 +427,9 @@ function TeamPanel({
                         </span>
                       ) : null}
                     </span>
-                    <span className="text-brand-muted">{money(row.amount)}</span>
+                    <span className="text-brand-muted">
+                      {money(row.amount)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -433,7 +465,10 @@ function TeamPanel({
           ) : null}
 
           {exceptions.length > 0 ? (
-            <ExceptionList exceptions={exceptions} />
+            <ExceptionList
+              exceptions={exceptions}
+              onRetire={onRetireException}
+            />
           ) : null}
         </div>
       ) : null}
@@ -465,6 +500,14 @@ export default function SalaryManagementPage() {
   );
 
   const [term, setTerm] = useState("");
+  const [creatingException, setCreatingException] = useState(false);
+
+  const [retire] = useRetireTradeExceptionMutation();
+
+  const retireException = (exceptionId: number) => {
+    if (!leagueId) return;
+    void retire({ leagueId, exceptionId });
+  };
 
   const hardCapByTeamId = useMemo(
     () => new Map((hardCaps?.teams ?? []).map((row) => [row.team.id, row])),
@@ -524,14 +567,25 @@ export default function SalaryManagementPage() {
             {data ? seasonLabel(data.seasonStartYear) : "this season"}.
           </p>
         </div>
-        <div className="relative">
-          <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
-          <input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="Search teams or players"
-            className="w-60 rounded-lg border border-brand-border py-2 pl-9 pr-3 text-sm text-brand-dark outline-none focus:border-brand-cta"
-          />
+        <div className="flex items-center gap-2">
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setCreatingException(true)}
+              className="rounded-lg border border-brand-border px-3 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-soft"
+            >
+              Create TPE
+            </button>
+          ) : null}
+          <div className="relative">
+            <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
+            <input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder="Search teams or players"
+              className="w-60 rounded-lg border border-brand-border py-2 pl-9 pr-3 text-sm text-brand-dark outline-none focus:border-brand-cta"
+            />
+          </div>
         </div>
       </div>
 
@@ -609,10 +663,22 @@ export default function SalaryManagementPage() {
                 hardCap={hardCapByTeamId.get(team.id)}
                 exceptions={exceptionsByTeamId.get(team.id) ?? []}
                 onEditContract={canEdit ? setEditing : null}
+                onRetireException={canEdit ? retireException : null}
               />
             ))
           : null}
       </div>
+
+      <CreateTradeExceptionModal
+        open={creatingException}
+        leagueId={leagueId}
+        teams={(data?.teams ?? []).map((team) => ({
+          id: team.id,
+          name: team.name,
+          abbr: team.abbr,
+        }))}
+        onClose={() => setCreatingException(false)}
+      />
 
       {leagueId ? (
         <EditContractModal

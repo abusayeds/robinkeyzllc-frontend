@@ -14,11 +14,10 @@ import TeamIntel from "./TeamIntel";
 import WaiveModal from "./WaiveModal";
 import RosterComposition from "./RosterComposition";
 import RosterTable from "./RosterTable";
+import { money } from "@/lib/money";
 
 const TABS = ["Roster", "Injured Reserve", "Rights Held"] as const;
 type Tab = (typeof TABS)[number];
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 const short = (value: number) => {
   if (Math.abs(value) >= 1_000_000)

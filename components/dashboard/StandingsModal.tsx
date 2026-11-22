@@ -6,6 +6,7 @@ import {
   useSetTeamRecordMutation,
   type StandingRow,
 } from "@/lib/store/api/endpoints/standingsApi";
+import { useModalShell } from "@/lib/useModalShell";
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -53,27 +54,16 @@ export default function StandingsModal({
 
   const [save, { isLoading: saving }] = useSetTeamRecordMutation();
 
+  // The record as it stands, each time a different team is opened.
   useEffect(() => {
     if (!open || !team) return;
     setWins(team.w);
     setLosses(team.l);
     setTies(team.t);
     setError(null);
+  }, [open, team]);
 
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, [open, team, onClose]);
+  useModalShell(open && Boolean(team), onClose);
 
   if (!open || !team) return null;
 

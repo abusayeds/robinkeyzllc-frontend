@@ -35,11 +35,11 @@ import {
 } from "@/lib/store/api/endpoints/standingsApi";
 import { TIER_TONE } from "@/lib/store/api/endpoints/salaryApi";
 import { useAppSelector } from "@/lib/store/hooks";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
@@ -186,7 +186,13 @@ function Attention({ items }: { items: AttentionItem[] }) {
  * on the commissioner's cap sheet, and a hard cap is drawn heavier than the
  * lines a team may cross (Rule 4.1).
  */
-function CapBar({ cap, hardCap }: { cap: TeamDashboard["cap"]; hardCap: TeamDashboard["hardCap"] }) {
+function CapBar({
+  cap,
+  hardCap,
+}: {
+  cap: TeamDashboard["cap"];
+  hardCap: TeamDashboard["hardCap"];
+}) {
   if (!cap.isSet) return null;
 
   const scale = cap.secondApron || cap.salaryCap;
@@ -236,7 +242,8 @@ export default function DashboardPage() {
     skip: !leagueId,
   });
   const myTeamId = useMemo(
-    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    () =>
+      memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
     [memberships, leagueId],
   );
 
@@ -359,7 +366,9 @@ export default function DashboardPage() {
   }
 
   if (isLoading || !data) {
-    return <p className="text-sm text-brand-muted">Loading your front office…</p>;
+    return (
+      <p className="text-sm text-brand-muted">Loading your front office…</p>
+    );
   }
 
   const { team, cap, hardCap, roster, attention, upcoming, activity } = data;
@@ -453,7 +462,6 @@ export default function DashboardPage() {
               .join(" · ") || `Minimum ${roster.minRosterSize}`
           }
         />
-
       </div>
 
       {attention.length > 0 ? <Attention items={attention} /> : null}
@@ -622,12 +630,8 @@ export default function DashboardPage() {
                   </span>
                   <span className="text-brand-muted">
                     {[
-                      year.firstRound > 0
-                        ? `${year.firstRound} × 1st`
-                        : null,
-                      year.secondRound > 0
-                        ? `${year.secondRound} × 2nd`
-                        : null,
+                      year.firstRound > 0 ? `${year.firstRound} × 1st` : null,
+                      year.secondRound > 0 ? `${year.secondRound} × 2nd` : null,
                       year.viaTrade > 0 ? `${year.viaTrade} via trade` : null,
                     ]
                       .filter(Boolean)
@@ -659,7 +663,8 @@ export default function DashboardPage() {
                         {item.type}
                         {item.teams ? (
                           <span className="font-normal text-brand-muted">
-                            {" "}— {item.teams}
+                            {" "}
+                            — {item.teams}
                           </span>
                         ) : null}
                       </span>

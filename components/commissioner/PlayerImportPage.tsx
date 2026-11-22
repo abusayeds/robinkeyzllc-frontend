@@ -32,13 +32,12 @@ import {
 } from "@/lib/store/api/endpoints/playerImportApi";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
+import { money } from "@/lib/money";
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
   return message ?? fallback;
 };
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 /**
  * Shows a cell the way it was typed, not the way we read it.
@@ -191,9 +190,7 @@ function RowResolver({
         </p>
         <p className="mt-1 text-xs text-brand-muted">
           Creates{" "}
-          <span className="font-semibold text-brand-dark">
-            {row.rawPlayer}
-          </span>{" "}
+          <span className="font-semibold text-brand-dark">{row.rawPlayer}</span>{" "}
           from this name. Use it when the API has never carried him.
         </p>
         <button
@@ -261,9 +258,12 @@ export default function PlayerImportPage() {
     setDownloading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/leagues/${leagueId}/import/template`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
+      const res = await fetch(
+        `${API_URL}/leagues/${leagueId}/import/template`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        },
+      );
       if (!res.ok) throw new Error("Template download failed");
 
       const blob = await res.blob();
@@ -413,7 +413,9 @@ export default function PlayerImportPage() {
           >
             <FiUploadCloud className="h-8 w-8 text-brand-cta-dark" />
             <p className="mt-3 text-sm font-semibold text-brand-dark">
-              {uploading ? "Reading the file…" : "Click or drag a CSV file here"}
+              {uploading
+                ? "Reading the file…"
+                : "Click or drag a CSV file here"}
             </p>
             <p className="mt-1 text-xs text-brand-muted">
               Saved as CSV (UTF-8), up to 2 MB
@@ -437,16 +439,16 @@ export default function PlayerImportPage() {
             className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-cta-dark hover:underline disabled:opacity-50"
           >
             <FiDownload className="h-3.5 w-3.5" />
-            {downloading ? "Preparing…" : "Download the template for this league"}
+            {downloading
+              ? "Preparing…"
+              : "Download the template for this league"}
           </button>
 
           <ImportGuide />
         </div>
       ) : null}
 
-      {isLoading ? (
-        <p className="text-sm text-brand-muted">Loading…</p>
-      ) : null}
+      {isLoading ? <p className="text-sm text-brand-muted">Loading…</p> : null}
 
       {done === null && preview && preview.status === "preview" ? (
         <>
@@ -496,7 +498,9 @@ export default function PlayerImportPage() {
                 {
                   label: "Still to resolve",
                   value: blockingRows.length,
-                  tone: blockingRows.length ? "text-red-500" : "text-brand-muted",
+                  tone: blockingRows.length
+                    ? "text-red-500"
+                    : "text-brand-muted",
                 },
               ].map((stat) => (
                 <div
@@ -575,7 +579,9 @@ export default function PlayerImportPage() {
                           key={season}
                           className="px-3 py-2.5 text-right text-brand-dark"
                         >
-                          <SeasonCell raw={row.rawSeasons[String(season)] ?? ""} />
+                          <SeasonCell
+                            raw={row.rawSeasons[String(season)] ?? ""}
+                          />
                         </td>
                       ))}
                       <td className="px-3 py-2.5 text-center text-brand-muted">

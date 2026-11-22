@@ -7,8 +7,7 @@ import {
   TRADE_STATUS_TONE,
   type Trade,
 } from "@/lib/store/api/endpoints/tradeApi";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 /**
  * The full trade, for a commissioner deciding on it.

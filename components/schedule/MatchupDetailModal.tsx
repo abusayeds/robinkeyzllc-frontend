@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { FiX } from "react-icons/fi";
 import {
   useMatchupDetailQuery,
@@ -10,10 +9,15 @@ import {
 import { useAppSelector } from "@/lib/store/hooks";
 import TeamLogo from "@/components/ui/TeamLogo";
 import { centerLabel, formatCategory } from "./utils";
+import { useModalShell } from "@/lib/useModalShell";
 
 function abbr(name?: string) {
   if (!name) return "TBD";
-  return name.replace(/[^A-Za-z ]/g, "").slice(0, 3).toUpperCase().trim();
+  return name
+    .replace(/[^A-Za-z ]/g, "")
+    .slice(0, 3)
+    .toUpperCase()
+    .trim();
 }
 
 export default function MatchupDetailModal({
@@ -42,20 +46,7 @@ export default function MatchupDetailModal({
     { skip: !activeLeague?.id || !matchup },
   );
 
-  useEffect(() => {
-    if (!matchup) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-    };
-  }, [matchup, onClose]);
+  useModalShell(Boolean(matchup), onClose);
 
   if (!matchup) return null;
   const showScore = matchup.status !== "upcoming";
@@ -100,7 +91,9 @@ export default function MatchupDetailModal({
 
             <div className="flex flex-col items-center">
               <span className="text-2xl font-bold text-brand-dark">
-                {showScore ? `${matchup.homeScore} - ${matchup.awayScore}` : "— vs —"}
+                {showScore
+                  ? `${matchup.homeScore} - ${matchup.awayScore}`
+                  : "— vs —"}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-muted">
                 {centerLabel(matchup)}

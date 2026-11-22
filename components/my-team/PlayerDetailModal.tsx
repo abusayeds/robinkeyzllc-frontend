@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
 import { avatarSrc } from "@/lib/avatar";
@@ -10,6 +9,7 @@ import {
   type PlayerGameLogRow,
 } from "@/lib/store/api/endpoints/playerApi";
 import { SLOT_LABEL, STATUS_LABEL } from "@/lib/store/api/endpoints/rosterApi";
+import { useModalShell } from "@/lib/useModalShell";
 
 const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
@@ -85,20 +85,7 @@ export default function PlayerDetailModal({
   onAddToBlock?: (playerId: number) => void;
   actionLabel?: string;
 }) {
-  useEffect(() => {
-    if (playerId === null) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-    };
-  }, [playerId, onClose]);
+  useModalShell(playerId !== null, onClose);
 
   const { data, isLoading, isError } = usePlayerProfileQuery(
     { leagueId: leagueId as number, playerId: playerId as number },

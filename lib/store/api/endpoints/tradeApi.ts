@@ -214,7 +214,7 @@ export type TradeEvaluation = {
 
 export type EvaluateTradeInput = {
   teamIds: number[];
-  assets: ProposeTradeInput['assets'];
+  assets: ProposeTradeInput["assets"];
 };
 
 export type TradeBlockEntry = {
@@ -300,6 +300,53 @@ export const tradeApi = baseApi.injectEndpoints({
       transformResponse: (r: ApiResponse<TradeExceptionRow[]>) => unwrap(r),
       providesTags: (_result, _error, { leagueId }) => [
         { type: "Trades" as const, id: leagueId },
+      ],
+    }),
+
+    /**
+     * A commissioner records an exception the app did not create itself.
+     *
+     * Article 7 writes one out of every trade processed here. This is for one
+     * that came from somewhere else — a league carried over, or a deal settled
+     * off the record — which otherwise could not be entered at all.
+     */
+    createTradeException: builder.mutation<
+      TradeExceptionRow,
+      {
+        leagueId: number;
+        teamId: number;
+        amount: number;
+        remaining?: number;
+        expiresAt?: string;
+        label?: string;
+      }
+    >({
+      query: ({ leagueId, ...body }) => ({
+        url: `/leagues/${leagueId}/trades/exceptions`,
+        method: "POST",
+        body,
+      }),
+      transformResponse: (r: ApiResponse<TradeExceptionRow>) => unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Trades" as const, id: leagueId },
+        { type: "Salaries" as const, id: leagueId },
+      ],
+    }),
+
+    /** Retires one. Deactivated, never deleted: a past trade may point at it. */
+    retireTradeException: builder.mutation<
+      { id: number; isActive: boolean },
+      { leagueId: number; exceptionId: number }
+    >({
+      query: ({ leagueId, exceptionId }) => ({
+        url: `/leagues/${leagueId}/trades/exceptions/${exceptionId}`,
+        method: "DELETE",
+      }),
+      transformResponse: (r: ApiResponse<{ id: number; isActive: boolean }>) =>
+        unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Trades" as const, id: leagueId },
+        { type: "Salaries" as const, id: leagueId },
       ],
     }),
 
@@ -437,6 +484,8 @@ export const {
   useLeagueTradesQuery,
   useTradeQuery,
   useTradeExceptionsQuery,
+  useCreateTradeExceptionMutation,
+  useRetireTradeExceptionMutation,
   useProposeTradeMutation,
   useRespondToTradeMutation,
   useWithdrawTradeMutation,

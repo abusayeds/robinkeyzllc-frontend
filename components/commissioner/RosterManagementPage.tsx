@@ -14,8 +14,7 @@ import {
 } from "@/lib/store/api/endpoints/rosterApi";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const initials = (name: string) =>
   name
@@ -186,7 +185,9 @@ function TeamCard({
             </p>
           </div>
         </div>
-        <p className="text-sm font-semibold text-brand-dark">{money(payroll)}</p>
+        <p className="text-sm font-semibold text-brand-dark">
+          {money(payroll)}
+        </p>
       </div>
 
       {team.warnings.length > 0 ? (

@@ -14,11 +14,12 @@ import type {
  * projection rather than a second guess at it.
  */
 
-const money = (value: number) => {
+const money = (value: number | null | undefined) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
   const millions = value / 1_000_000;
   const sign = value < 0 ? "-" : "";
   const abs = Math.abs(millions);
-  return `${sign}$${abs >= 100 ? Math.round(abs) : abs.toFixed(1)}M`;
+  return `${sign}${abs >= 100 ? Math.round(abs) : abs.toFixed(1)}M`;
 };
 
 const seasonLabel = (year: number) =>
@@ -122,7 +123,10 @@ export function ContractBreakdownCard({
       // Split where the contract splits: the guaranteed part is owed, the
       // rest is not.
       guaranteed += season.guaranteedAmount ?? 0;
-      nonGuaranteed += Math.max(0, season.capHit - (season.guaranteedAmount ?? 0));
+      nonGuaranteed += Math.max(
+        0,
+        season.capHit - (season.guaranteedAmount ?? 0),
+      );
     } else {
       guaranteed += season.capHit;
     }

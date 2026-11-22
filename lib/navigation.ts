@@ -1,9 +1,5 @@
 import type { IconType } from "react-icons";
-import {
-  BiSolidDashboard,
-  BiNews,
-  BiTransfer,
-} from "react-icons/bi";
+import { BiSolidDashboard, BiNews, BiTransfer } from "react-icons/bi";
 import {
   MdOutlineGroups,
   MdOutlineCalendarMonth,
@@ -156,29 +152,77 @@ export const commissionerNav: NavSection[] = [
   {
     title: "LEAGUE SETTINGS",
     items: [
-      { label: "League Settings", href: "/league-office/settings", icon: MdOutlineSettings },
-      { label: "Salary Cap Settings", href: "/league-office/salary-cap", icon: HiOutlineCalculator },
-      { label: "Roster Rules", href: "/league-office/roster-rules", icon: HiOutlineDocumentText },
-      { label: "League Calendar", href: "/league-office/calendar", icon: MdOutlineCalendarMonth },
+      {
+        label: "League Settings",
+        href: "/league-office/settings",
+        icon: MdOutlineSettings,
+      },
+      {
+        label: "Salary Cap Settings",
+        href: "/league-office/salary-cap",
+        icon: HiOutlineCalculator,
+      },
+      {
+        label: "Roster Rules",
+        href: "/league-office/roster-rules",
+        icon: HiOutlineDocumentText,
+      },
+      {
+        label: "League Calendar",
+        href: "/league-office/calendar",
+        icon: MdOutlineCalendarMonth,
+      },
     ],
   },
   {
     title: "OPERATIONS",
     items: [
       { label: "User Assignment", href: "/league-office/users", icon: LuUsers },
-      { label: "Team Management", href: "/league-office/teams", icon: MdOutlineGroups },
-      { label: "Roster Management", href: "/league-office/rosters", icon: HiOutlineUserGroup },
-      { label: "Salary Management", href: "/league-office/salaries", icon: RiExchangeFundsLine },
-      { label: "Player Import", href: "/league-office/player-import", icon: TbFileImport },
-      { label: "Free Agency Management", href: "/league-office/free-agency", icon: MdOutlinePersonSearch },
+      {
+        label: "Team Management",
+        href: "/league-office/teams",
+        icon: MdOutlineGroups,
+      },
+      {
+        label: "Roster Management",
+        href: "/league-office/rosters",
+        icon: HiOutlineUserGroup,
+      },
+      {
+        label: "Salary Management",
+        href: "/league-office/salaries",
+        icon: RiExchangeFundsLine,
+      },
+      {
+        label: "Player Import",
+        href: "/league-office/player-import",
+        icon: TbFileImport,
+      },
+      {
+        label: "Free Agency Management",
+        href: "/league-office/free-agency",
+        icon: MdOutlinePersonSearch,
+      },
     ],
   },
   {
     title: "DRAFT",
     items: [
-      { label: "Draft Picks", href: "/league-office/draft-picks", icon: HiOutlineTicket },
-      { label: "Startup Draft", href: "/league-office/startup-draft", icon: MdOutlineSportsBasketball },
-      { label: "Rookie Draft", href: "/league-office/rookie-draft", icon: TbTrophy },
+      {
+        label: "Draft Picks",
+        href: "/league-office/draft-picks",
+        icon: HiOutlineTicket,
+      },
+      {
+        label: "Startup Draft",
+        href: "/league-office/startup-draft",
+        icon: MdOutlineSportsBasketball,
+      },
+      {
+        label: "Rookie Draft",
+        href: "/league-office/rookie-draft",
+        icon: TbTrophy,
+      },
     ],
   },
   {
@@ -197,21 +241,35 @@ export const commissionerNav: NavSection[] = [
 export const adminNav: NavSection[] = [
   {
     title: "OVERVIEW",
-    items: [
-      { label: "Dashboard", href: "/platform", icon: BiSolidDashboard },
-    ],
+    items: [{ label: "Dashboard", href: "/platform", icon: BiSolidDashboard }],
   },
   {
     title: "PLATFORM MANAGEMENT",
     items: [
       { label: "Leagues", href: "/platform/leagues", icon: LuBuilding2 },
       { label: "Users", href: "/platform/users", icon: LuUsers },
-      { label: "Player Birthdates", href: "/platform/birthdates", icon: TbCake },
+      // Rule 2.3 — the league year figures every league runs on by default.
+      {
+        label: "Salary Cap Settings",
+        href: "/platform/salary-cap",
+        icon: HiOutlineCalculator,
+      },
+      {
+        label: "Player Birthdates",
+        href: "/platform/birthdates",
+        icon: TbCake,
+      },
     ],
   },
   {
     title: "TOOLS",
-    items: [{ label: "Settings", href: "/platform/settings", icon: MdOutlineSettings }],
+    items: [
+      {
+        label: "Settings",
+        href: "/platform/settings",
+        icon: MdOutlineSettings,
+      },
+    ],
   },
 ];
 
@@ -245,13 +303,14 @@ export const pageSubtitles: Record<string, string> = {
     "Configure draft format, pick times, and team order for the league startup draft.",
   "/league-office/rookie-draft":
     "Configure your rookie draft format, pick times, and team order for the league rookie draft.",
-  "/league-office/calendar":
-    "Key dates and events for this season.",
+  "/league-office/calendar": "Key dates and events for this season.",
   "/league-office/settings":
     "Configure league identity, setup, visibility, and trading rules.",
   "/platform": "Here's what's happening across AVORA.",
   "/platform/users": "Here's what's happening across AVORA.",
   "/platform/leagues": "Here's what's happening across AVORA.",
+  "/platform/salary-cap":
+    "Enter each league year's figures. Every league runs on these unless it has entered its own.",
   "/platform/birthdates":
     "Load player birthdates from a CSV. The NBA data feed does not carry them.",
   "/platform/settings": "Manage your admin profile and system configurations.",
@@ -282,6 +341,7 @@ export const pageTitles: Record<string, string> = {
   "/platform": "Platform Overview",
   "/platform/users": "Users",
   "/platform/leagues": "Leagues",
+  "/platform/salary-cap": "Salary Cap Settings",
   "/platform/birthdates": "Player Birthdates",
   "/platform/settings": "Settings",
   "/dashboard": "Dashboard",

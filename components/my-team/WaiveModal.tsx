@@ -7,9 +7,7 @@ import {
   useWaivePlayerMutation,
   useWaivePreviewQuery,
 } from "@/lib/store/api/endpoints/rosterApi";
-
-const money = (value: number) =>
-  `$${Math.round(value).toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;

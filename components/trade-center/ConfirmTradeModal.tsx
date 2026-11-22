@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { FiAlertTriangle, FiX } from "react-icons/fi";
 import type { TradeEvaluation } from "@/lib/store/api/endpoints/tradeApi";
+import { useModalShell } from "@/lib/useModalShell";
 
 export default function ConfirmTradeModal({
   open,
@@ -26,22 +26,7 @@ export default function ConfirmTradeModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, [open, onClose]);
+  useModalShell(open, onClose);
 
   if (!open) return null;
 

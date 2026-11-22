@@ -14,9 +14,7 @@ export default function AccountCreatedView() {
       />
 
       <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-10 text-center backdrop-blur">
-        {/* The mark fills the circle rather than floating in the middle of
-            it: a 40px image inside a 64px circle read as a mistake. The same
-            icon the sidebar uses, so the brand is one file. */}
+  
         <div className="relative mx-auto mb-6 h-16 w-16 overflow-hidden rounded-full bg-white/10">
           <Image
             src="/image/logo-icon.png"

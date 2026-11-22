@@ -124,8 +124,10 @@ export default function OnboardingView() {
       </button>
 
       <div className="relative flex min-h-screen flex-col items-center justify-end px-6 pb-14 text-center sm:pb-20">
+        {/* Sign in is the first thing a returning visitor needs; creating an
+            account is one tap further on, from the sign-in page. */}
         <Link
-          href="/register"
+          href="/login"
           aria-hidden={!ended}
           tabIndex={ended ? 0 : -1}
           className={`mt-10 inline-flex items-center justify-center rounded-full bg-brand-cta px-12 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-cta/30 transition-all duration-500 hover:bg-brand-cta-dark ${

@@ -10,8 +10,7 @@ import {
   type TradeBlockEntry,
 } from "@/lib/store/api/endpoints/tradeApi";
 import TeamLogo from "@/components/ui/TeamLogo";
-
-const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -77,10 +76,15 @@ export default function TradeBlockTab({
     return map;
   }, [block]);
 
-  const others = useMemo(() => {
-    const entries = (block?.entries ?? []).filter(
-      (entry) => entry.team.id !== myTeamId,
-    );
+  // Everything listed in the league, this team's own included: an owner who
+  // has just put a player up should be able to see him on the board the rest
+  // of the league sees. Own listings are marked and offer no Propose button.
+  const board = useMemo(() => {
+    const entries = [...(block?.entries ?? [])].sort((a, b) => {
+      const mine =
+        Number(b.team.id === myTeamId) - Number(a.team.id === myTeamId);
+      return mine !== 0 ? mine : a.name.localeCompare(b.name);
+    });
     const needle = term.trim().toLowerCase();
     if (!needle) return entries;
     return entries.filter(
@@ -247,10 +251,10 @@ export default function TradeBlockTab({
             <p className="px-4 py-10 text-center text-sm text-brand-muted">
               Loading…
             </p>
-          ) : others.length === 0 ? (
+          ) : board.length === 0 ? (
             <div className="px-4 py-10 text-center">
               <p className="text-sm font-semibold text-brand-dark">
-                Nobody else has listed a player yet.
+                Nobody has listed a player yet.
               </p>
               <p className="mt-1 text-sm text-brand-muted">
                 List one of yours and the rest of the league will see it here.
@@ -258,10 +262,11 @@ export default function TradeBlockTab({
             </div>
           ) : (
             <ul className="divide-y divide-brand-border">
-              {others.map((entry) => (
+              {board.map((entry) => (
                 <Listing
                   key={entry.id}
                   entry={entry}
+                  isMine={entry.team.id === myTeamId}
                   onProposeTo={() => onProposeTo(entry.team.id)}
                 />
               ))}
@@ -275,9 +280,11 @@ export default function TradeBlockTab({
 
 function Listing({
   entry,
+  isMine,
   onProposeTo,
 }: {
   entry: TradeBlockEntry;
+  isMine: boolean;
   onProposeTo: () => void;
 }) {
   return (
@@ -285,8 +292,13 @@ function Listing({
       <div className="flex items-center gap-3">
         <Avatar name={entry.name} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-brand-dark">
-            {entry.name}
+          <p className="flex items-center gap-2 text-sm font-semibold text-brand-dark">
+            <span className="truncate">{entry.name}</span>
+            {isMine ? (
+              <span className="shrink-0 rounded-full bg-brand-cta/15 px-2 py-0.5 text-[10px] font-semibold text-brand-cta-dark">
+                Yours
+              </span>
+            ) : null}
           </p>
           <p className="flex items-center gap-1.5 text-xs text-brand-muted">
             <TeamLogo
@@ -310,15 +322,17 @@ function Listing({
         <p className="mt-2 text-xs italic text-brand-muted">“{entry.note}”</p>
       ) : null}
 
-      <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={onProposeTo}
-          className="rounded-lg bg-brand-cta px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-cta-dark"
-        >
-          Propose Trade
-        </button>
-      </div>
+      {isMine ? null : (
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={onProposeTo}
+            className="rounded-lg bg-brand-cta px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-cta-dark"
+          >
+            Propose Trade
+          </button>
+        </div>
+      )}
     </li>
   );
 }

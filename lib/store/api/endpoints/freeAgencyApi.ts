@@ -91,6 +91,8 @@ export type PoolOffer = {
   raisePct: number;
   contractType: string;
   signedVia: string;
+  /** Rule 10.6 — 'player' or 'team' on the final season, or null. */
+  finalYearOption: string | null;
   /** Rule 10.1 — one figure per season, and empty for every other type. */
   guaranteedAmounts: number[];
   totalValue: number;
@@ -152,6 +154,8 @@ export type OfferInput = {
   raisePct?: number;
   contractType?: string;
   signedVia?: string;
+  /** Rule 10.6 — 'player' or 'team'. Needs a deal of at least two years. */
+  finalYearOption?: string;
   /** Required for a partially guaranteed offer: one figure per season. */
   guaranteedAmounts?: number[];
   expiresAt?: string;

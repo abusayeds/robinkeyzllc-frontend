@@ -19,8 +19,7 @@ import { useLeagueOverviewQuery } from "@/lib/store/api/endpoints/overviewApi";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
 import TradeDetail from "./TradeDetail";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -153,7 +152,8 @@ export default function ActionCenterPage() {
    */
   const other = useMemo(() => {
     if (!overview) return [];
-    const list: { label: string; sub: string; href: string; tone: string }[] = [];
+    const list: { label: string; sub: string; href: string; tone: string }[] =
+      [];
 
     if (overview.attention.pendingOffers > 0) {
       list.push({
@@ -324,8 +324,7 @@ export default function ActionCenterPage() {
         onReject={(reason) =>
           open
             ? void run(
-                () =>
-                  reject({ leagueId, tradeId: open.id, reason }).unwrap(),
+                () => reject({ leagueId, tradeId: open.id, reason }).unwrap(),
                 "That trade could not be rejected.",
               )
             : undefined

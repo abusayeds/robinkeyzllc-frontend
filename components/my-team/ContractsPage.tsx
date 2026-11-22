@@ -151,6 +151,8 @@ export default function ContractsPage() {
       ) : (
         <>
           <CapSummaryCards
+            leagueId={leagueId}
+            teamId={activeTeamId as number}
             cap={data.cap}
             counts={data.counts}
             rules={data.rules}

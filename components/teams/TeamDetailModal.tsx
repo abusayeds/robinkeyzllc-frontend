@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { FiX } from "react-icons/fi";
 
 import TeamLogo from "@/components/ui/TeamLogo";
@@ -12,6 +11,7 @@ import {
   ordinal,
   type LeagueTeamRow,
 } from "./utils";
+import { useModalShell } from "@/lib/useModalShell";
 
 /**
  * Room left under each of Article 3's thresholds.
@@ -54,20 +54,7 @@ export default function TeamDetailModal({
   team: LeagueTeamRow | null;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    if (!team) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-    };
-  }, [team, onClose]);
+  useModalShell(Boolean(team), onClose);
 
   if (!team) return null;
 

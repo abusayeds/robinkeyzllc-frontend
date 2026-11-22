@@ -20,11 +20,11 @@ import {
   type LeagueOverview,
 } from "@/lib/store/api/endpoints/overviewApi";
 import { useAppSelector } from "@/lib/store/hooks";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const short = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${value}`;
 };
@@ -171,7 +171,8 @@ export default function LeagueOfficePage() {
 
   const alerts = useMemo(() => {
     if (!data) return [];
-    const list: { label: string; sub: string; href: string; tone: string }[] = [];
+    const list: { label: string; sub: string; href: string; tone: string }[] =
+      [];
 
     if (data.attention.pendingInvites > 0) {
       list.push({
@@ -322,10 +323,7 @@ export default function LeagueOfficePage() {
           ) : (
             <ul className="divide-y divide-brand-border">
               {data.upcoming.map((event) => (
-                <li
-                  key={event.id}
-                  className="flex items-start gap-2.5 py-2.5"
-                >
+                <li key={event.id} className="flex items-start gap-2.5 py-2.5">
                   <FiCalendar className="mt-0.5 h-4 w-4 shrink-0 text-brand-muted" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-brand-dark">
@@ -334,9 +332,7 @@ export default function LeagueOfficePage() {
                     <p className="text-xs text-brand-muted">
                       {event.displayLabel ??
                         `${event.isApproximate ? "around " : ""}${formatDate(event.startDate)}${
-                          event.endDate
-                            ? ` – ${formatDate(event.endDate)}`
-                            : ""
+                          event.endDate ? ` – ${formatDate(event.endDate)}` : ""
                         }`}
                     </p>
                   </div>

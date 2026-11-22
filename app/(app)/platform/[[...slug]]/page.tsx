@@ -3,6 +3,7 @@ import PlatformOverviewPage from "@/components/platform/PlatformOverviewPage";
 import PlatformUsersPage from "@/components/platform/PlatformUsersPage";
 import PlatformLeaguesPage from "@/components/platform/PlatformLeaguesPage";
 import PlayerBirthdatesPage from "@/components/platform/PlayerBirthdatesPage";
+import PlatformSalaryCapPage from "@/components/platform/PlatformSalaryCapPage";
 import SettingsPage from "@/components/settings/SettingsPage";
 import PagePlaceholder from "@/components/ui/PagePlaceholder";
 
@@ -12,6 +13,7 @@ const PAGES: Record<string, () => ReactElement> = {
   users: () => <PlatformUsersPage />,
   leagues: () => <PlatformLeaguesPage />,
   birthdates: () => <PlayerBirthdatesPage />,
+  "salary-cap": () => <PlatformSalaryCapPage />,
   // The platform admin gets the profile card only. The other tabs are the
   // information pages of one league, and there is no league here.
   settings: () => <SettingsPage tab="profile" />,

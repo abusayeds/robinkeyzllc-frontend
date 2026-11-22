@@ -7,14 +7,9 @@
  * does not decide anything.
  */
 
-export const money = (value: number) => `$${value.toLocaleString("en-US")}`;
-
-/** Compact, for table cells where a full figure would not fit. */
-export const shortMoney = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
-  return `$${value}`;
-};
+// Re-exported so every free-agency screen keeps importing its figures from
+// here, while the formatting itself lives in one null-safe place.
+export { money, shortMoney } from "@/lib/money";
 
 export const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
 import { FiPlus, FiX } from "react-icons/fi";
 import type { Team } from "@/lib/store/api/endpoints/teamApi";
 import TeamLogo from "@/components/ui/TeamLogo";
+import { useModalShell } from "@/lib/useModalShell";
 
 export default function AddTeamModal({
   open,
@@ -20,24 +20,7 @@ export default function AddTeamModal({
   onPick: (teamId: number) => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    // Both <html> and <body>: on some browsers the scrolling element is the
-    // root, so locking only body leaves the page moving behind the modal.
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, [open, onClose]);
+  useModalShell(open, onClose);
 
   if (!open) return null;
 

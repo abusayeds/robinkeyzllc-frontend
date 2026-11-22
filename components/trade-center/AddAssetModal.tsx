@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiChevronDown,
+  FiChevronRight,
   FiChevronUp,
   FiPlus,
   FiSearch,
@@ -14,8 +15,7 @@ import { useTeamRosterQuery } from "@/lib/store/api/endpoints/rosterApi";
 import { useTradeExceptionsQuery } from "@/lib/store/api/endpoints/tradeApi";
 import type { PickedAsset, TeamCard } from "./TeamPanel";
 import { assetKey } from "./TeamPanel";
-
-const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const TABS = [
   { id: "players", label: "Players", icon: LuUsers },
@@ -72,6 +72,8 @@ export default function AddAssetModal({
   // there.
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [descending, setDescending] = useState(false);
+  // Rounds start open; the map only records the ones an owner has collapsed.
+  const [openRounds, setOpenRounds] = useState<Record<number, boolean>>({});
 
   const sortBy = (key: SortKey) => {
     if (key === sortKey) {
@@ -156,17 +158,36 @@ export default function AddAssetModal({
     );
   }, [allPicks, needle]);
 
+  /**
+   * Picks in folders, one per round, years inside.
+   *
+   * A team holds two picks in each of seven drafts, so a flat list runs to
+   * fourteen rows an owner has to read through to find one year.
+   */
+  const pickRounds = useMemo(() => {
+    const byRound = new Map<number, typeof picks>();
+    for (const pick of picks) {
+      byRound.set(pick.round, [...(byRound.get(pick.round) ?? []), pick]);
+    }
+    return [...byRound.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([round, rows]) => ({
+        round,
+        label: rows[0].roundLabel,
+        picks: [...rows].sort((a, b) => a.seasonStartYear - b.seasonStartYear),
+      }));
+  }, [picks]);
+
   const tpes = useMemo(() => {
     if (!needle) return exceptions;
-    return exceptions.filter((tpe) =>
-      tpe.label.toLowerCase().includes(needle),
-    );
+    return exceptions.filter((tpe) => tpe.label.toLowerCase().includes(needle));
   }, [exceptions, needle]);
 
   const isPicked = (asset: PickedAsset) =>
     picked.some((other) => assetKey(other) === assetKey(asset));
 
-  const add = (asset: PickedAsset) => onToggle({ ...asset, toTeamId: defaultTo });
+  const add = (asset: PickedAsset) =>
+    onToggle({ ...asset, toTeamId: defaultTo });
 
   const total =
     (roster?.players ?? []).length + allPicks.length + exceptions.length;
@@ -295,6 +316,9 @@ export default function AddAssetModal({
                         fromTeamId: team.id,
                         toTeamId: defaultTo,
                         leaguePlayerId: player.id,
+                        // His own id, not this league's copy of him: the card
+                        // is opened by player, and reads every league he is in.
+                        playerId: player.playerId,
                         label: player.name,
                         salary: player.capHit ?? 0,
                         sub: player.position ?? undefined,
@@ -356,56 +380,93 @@ export default function AddAssetModal({
               </p>
             ) : (
               <ul className="divide-y divide-brand-border">
-                {picks.map((pick) => {
-                  const asset: PickedAsset = {
-                    kind: "draftPick",
-                    fromTeamId: team.id,
-                    toTeamId: defaultTo,
-                    draftPickId: pick.id,
-                    label: pickLabel(pick),
-                    // A pick is an asset, not money owed, so it adds nothing
-                    // to the salary-matching sum.
-                    salary: 0,
-                    sub: pick.isTraded
-                      ? `via ${pick.originalTeam.abbr}`
-                      : undefined,
-                    // Rule 12.7 — the card offers rollover years after this
-                    // draft, so it needs to know which draft the pick is in.
-                    pickYear: pick.seasonStartYear,
-                    // Whatever the pick already carries is the starting point;
-                    // the two owners can change it on the card.
-                    protectedTopN: pick.protectedTopN,
-                  };
+                {pickRounds.map((group) => {
+                  const open = openRounds[group.round] !== false;
                   return (
-                    <li
-                      key={pick.id}
-                      className="flex items-center justify-between gap-3 px-5 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-brand-dark">
-                          {pickLabel(pick)}
-                        </p>
-                        <p className="truncate text-xs text-brand-muted">
-                          {pick.isTraded
-                            ? `via ${pick.originalTeam.abbr} · `
-                            : ""}
-                          {pick.isTradeable
-                            ? pick.status === "Protected"
-                              ? `Top-${pick.protectedTopN} protected`
-                              : "Unprotected"
-                            : (pick.untradeableMessage ?? "Not tradeable")}
-                        </p>
-                      </div>
-                      <AddButton
-                        active={isPicked(asset)}
-                        // Rule 12.11 — the engine has already worked out
-                        // whether this one may move, and the server checks it
-                        // again. Disabling it here means nobody has to read a
-                        // refusal to find out.
-                        disabled={!pick.isTradeable}
-                        title={pick.untradeableMessage ?? undefined}
-                        onClick={() => add(asset)}
-                      />
+                    <li key={group.round}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenRounds((prev) => ({
+                            ...prev,
+                            [group.round]: !open,
+                          }))
+                        }
+                        aria-expanded={open}
+                        className="flex w-full items-center gap-2 bg-brand-soft/60 px-5 py-2 text-left text-xs font-semibold text-brand-dark transition hover:bg-brand-soft"
+                      >
+                        {open ? (
+                          <FiChevronDown className="h-3.5 w-3.5 shrink-0" />
+                        ) : (
+                          <FiChevronRight className="h-3.5 w-3.5 shrink-0" />
+                        )}
+                        <span>{group.label}</span>
+                        <span className="text-brand-muted">
+                          {group.picks.length}
+                        </span>
+                      </button>
+
+                      {open ? (
+                        <ul className="divide-y divide-brand-border">
+                          {group.picks.map((pick) => {
+                            const asset: PickedAsset = {
+                              kind: "draftPick",
+                              fromTeamId: team.id,
+                              toTeamId: defaultTo,
+                              draftPickId: pick.id,
+                              label: pickLabel(pick),
+                              // A pick is an asset, not money owed, so it adds
+                              // nothing to the salary-matching sum.
+                              salary: 0,
+                              sub: pick.isTraded
+                                ? `via ${pick.originalTeam.abbr}`
+                                : undefined,
+                              // Rule 12.7 — the card offers rollover years
+                              // after this draft, so it needs to know which
+                              // draft the pick is in.
+                              pickYear: pick.seasonStartYear,
+                              // Whatever the pick already carries is the
+                              // starting point; the two owners can change it
+                              // on the card.
+                              protectedTopN: pick.protectedTopN,
+                            };
+                            return (
+                              <li
+                                key={pick.id}
+                                className="flex items-center justify-between gap-3 py-2.5 pl-10 pr-5"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-brand-dark">
+                                    {pickLabel(pick)}
+                                  </p>
+                                  <p className="truncate text-xs text-brand-muted">
+                                    {pick.isTraded
+                                      ? `via ${pick.originalTeam.abbr} · `
+                                      : ""}
+                                    {pick.isTradeable
+                                      ? pick.status === "Protected"
+                                        ? `Top-${pick.protectedTopN} protected`
+                                        : "Unprotected"
+                                      : (pick.untradeableMessage ??
+                                        "Not tradeable")}
+                                  </p>
+                                </div>
+                                <AddButton
+                                  active={isPicked(asset)}
+                                  // Rule 12.11 — the engine has already worked
+                                  // out whether this one may move, and the
+                                  // server checks it again. Disabling it here
+                                  // means nobody has to read a refusal to find
+                                  // out.
+                                  disabled={!pick.isTradeable}
+                                  title={pick.untradeableMessage ?? undefined}
+                                  onClick={() => add(asset)}
+                                />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
                     </li>
                   );
                 })}

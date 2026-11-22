@@ -122,15 +122,15 @@ export default function LoginView() {
         </AuthButton>
       </form>
 
-      <p className="mt-6 text-center text-sm text-brand-muted">
-        Don&apos;t have an account?{" "}
+      <div className="mt-6 text-center">
+        <p className="text-sm text-brand-muted">Don&apos;t have an account?</p>
         <Link
           href="/register"
-          className="font-semibold text-brand-cta hover:text-brand-cta-dark"
+          className="mt-3 flex w-full items-center justify-center rounded-lg border border-brand-cta px-4 py-2.5 text-sm font-semibold text-brand-cta transition hover:bg-brand-cta hover:text-white"
         >
-          Sign up
+          Create Account
         </Link>
-      </p>
+      </div>
     </AuthShell>
   );
 }

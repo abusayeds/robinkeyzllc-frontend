@@ -13,8 +13,7 @@ import { useAppSelector } from "@/lib/store/hooks";
 import TeamSelector from "./TeamSelector";
 import { useViewedTeam } from "./viewedTeam";
 import { CONTRACTS_SUBNAV } from "./subnav";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString("en-US", {

@@ -30,30 +30,29 @@ const SIGNED_VIA = [
   { value: "disabledPlayerException", label: "Disabled Player Exception" },
 ];
 
+/** Rule 10.6 — the only two options the rule book recognises. */
+const FINAL_YEAR_OPTIONS = [
+  { value: "", label: "No option" },
+  { value: "player", label: "Player Option" },
+  { value: "team", label: "Team Option" },
+];
+
 /**
- * The four terms the old sheet listed as checkboxes.
+ * The two terms that are not a choice on this sheet.
  *
- * Not checkboxes here: each of them is already decided by a field above —
- * an option year is set on the contract, a partial guarantee by its type —
- * so a second control saying the same thing could disagree with the first.
- * They are explained instead.
+ * A partial guarantee is already named by the contract type and the per-season
+ * figures below it, so a second control for it could disagree with the first.
+ * A no-trade clause is not in the AVORA rule book at all, and offering a
+ * checkbox that changes nothing is worse than saying so.
  */
 const TERM_NOTES: { label: string; note: string }[] = [
   {
-    label: "Player Option",
-    note: "Set on the contract once it is signed, from the Contracts page.",
-  },
-  {
-    label: "Team Option",
-    note: "Also set on the contract, and only on a year after the first.",
+    label: "Partial Guarantee",
+    note: "Choose Partially Guaranteed as the contract type and name each season below.",
   },
   {
     label: "No Trade Clause",
     note: "Not part of the V1 rules. The rule book does not define one.",
-  },
-  {
-    label: "Partial Guarantee",
-    note: "Choose Partially Guaranteed as the type and name each season below.",
   },
 ];
 
@@ -84,6 +83,8 @@ export default function OfferSheetModal({
   const [raisePct, setRaisePct] = useState(0);
   const [contractType, setContractType] = useState("standard");
   const [signedVia, setSignedVia] = useState("capSpace");
+  // Rule 10.6 — a player or team option on the final season. "" is no option.
+  const [finalYearOption, setFinalYearOption] = useState("");
   // Rule 10.1 — what each season is guaranteed for, by season index. Only read
   // for a partially guaranteed offer; the other types say it by their name.
   const [guarantees, setGuarantees] = useState<number[]>([]);
@@ -94,11 +95,15 @@ export default function OfferSheetModal({
     if (!player) return;
     setYears(existing?.years ?? 1);
     setFirstYearSalary(
-      existing?.firstYearSalary ?? player.previousSalary ?? team?.minPlayerSalary ?? 0,
+      existing?.firstYearSalary ??
+        player.previousSalary ??
+        team?.minPlayerSalary ??
+        0,
     );
     setRaisePct(existing?.raisePct ?? 0);
     setContractType(existing?.contractType ?? "standard");
     setSignedVia(existing?.signedVia ?? "capSpace");
+    setFinalYearOption(existing?.finalYearOption ?? "");
     setGuarantees(existing?.guaranteedAmounts ?? []);
   }, [player, existing, team]);
 
@@ -113,6 +118,12 @@ export default function OfferSheetModal({
   }, [onClose]);
 
   const isTwoWay = contractType === "twoWay";
+
+  // Rule 10.6 — nothing to put an option on once the deal is one year, and a
+  // two-way contract carries none at all.
+  useEffect(() => {
+    if (years < 2 || isTwoWay) setFinalYearOption("");
+  }, [years, isTwoWay]);
   const isPartial = contractType === "partiallyGuaranteed";
 
   const rows = useMemo(
@@ -138,10 +149,14 @@ export default function OfferSheetModal({
    */
   const impact = useMemo(() => {
     if (!team) return [];
-    const first = isTwoWay ? 0 : rows[0]?.salary ?? 0;
+    const first = isTwoWay ? 0 : (rows[0]?.salary ?? 0);
     return [
       { label: "Payroll now", value: team.committed, money: true },
-      { label: "Payroll if signed", value: team.committed + first, money: true },
+      {
+        label: "Payroll if signed",
+        value: team.committed + first,
+        money: true,
+      },
       {
         label: "Cap space left",
         value: (team.capSpace ?? 0) - first,
@@ -180,7 +195,9 @@ export default function OfferSheetModal({
     }
     if (team.salaryCap > 0) {
       if (firstYearSalary < team.minPlayerSalary) {
-        list.push(`Below the league minimum of ${money(team.minPlayerSalary)}.`);
+        list.push(
+          `Below the league minimum of ${money(team.minPlayerSalary)}.`,
+        );
       }
       if (firstYearSalary > team.maxPlayerSalary) {
         list.push(`Above the maximum of ${money(team.maxPlayerSalary)}.`);
@@ -216,8 +233,8 @@ export default function OfferSheetModal({
             </h2>
             <p className="text-xs text-brand-muted">
               {player.name}
-              {player.position ? ` · ${player.position}` : ""} ·{" "}
-              {player.faType} · {BIRD_LABEL[player.birdRights]}
+              {player.position ? ` · ${player.position}` : ""} · {player.faType}{" "}
+              · {BIRD_LABEL[player.birdRights]}
               {player.faType === "RFA" && player.rightsTeam
                 ? ` · ${player.rightsTeam.abbr} holds his rights`
                 : ""}
@@ -329,7 +346,8 @@ export default function OfferSheetModal({
 
           <p className="text-[11px] text-brand-muted">
             Bird rights are applied automatically from his {player.birdYears}{" "}
-            bird year{player.birdYears === 1 ? "" : "s"} and are not chosen here.
+            bird year{player.birdYears === 1 ? "" : "s"} and are not chosen
+            here.
           </p>
 
           <div>
@@ -337,39 +355,39 @@ export default function OfferSheetModal({
               Salary Breakdown
             </p>
             <div className="overflow-x-auto rounded-lg border border-brand-border">
-            <table className="w-full min-w-[420px] text-sm">
-              <thead className="bg-brand-soft/60 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
-                <tr>
-                  <th className="px-3 py-2">Season</th>
-                  <th className="px-3 py-2 text-right">Salary</th>
-                  <th className="px-3 py-2 text-right">% of cap</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-border">
-                {rows.map((row) => (
-                  <tr key={row.seasonStartYear}>
-                    <td className="px-3 py-1.5 text-brand-muted">
-                      {seasonLabel(row.seasonStartYear)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-brand-dark">
-                      {money(row.salary)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-brand-muted">
-                      {row.pctOfCap === null
-                        ? "—"
-                        : `${row.pctOfCap.toFixed(1)}%`}
-                    </td>
+              <table className="w-full min-w-[420px] text-sm">
+                <thead className="bg-brand-soft/60 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
+                  <tr>
+                    <th className="px-3 py-2">Season</th>
+                    <th className="px-3 py-2 text-right">Salary</th>
+                    <th className="px-3 py-2 text-right">% of cap</th>
                   </tr>
-                ))}
-                <tr className="bg-brand-soft/40 font-semibold">
-                  <td className="px-3 py-1.5 text-brand-muted">Total</td>
-                  <td className="px-3 py-1.5 text-right text-brand-dark">
-                    {money(total)}
-                  </td>
-                  <td />
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-brand-border">
+                  {rows.map((row) => (
+                    <tr key={row.seasonStartYear}>
+                      <td className="px-3 py-1.5 text-brand-muted">
+                        {seasonLabel(row.seasonStartYear)}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-brand-dark">
+                        {money(row.salary)}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-brand-muted">
+                        {row.pctOfCap === null
+                          ? "—"
+                          : `${row.pctOfCap.toFixed(1)}%`}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-brand-soft/40 font-semibold">
+                    <td className="px-3 py-1.5 text-brand-muted">Total</td>
+                    <td className="px-3 py-1.5 text-right text-brand-dark">
+                      {money(total)}
+                    </td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -380,6 +398,29 @@ export default function OfferSheetModal({
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
                 Additional Terms
               </p>
+              <div className="mb-2 rounded-lg border border-brand-border px-3 py-2">
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-muted">
+                  Final Year Option
+                </label>
+                <select
+                  value={finalYearOption}
+                  onChange={(e) => setFinalYearOption(e.target.value)}
+                  disabled={years < 2}
+                  className="mt-1 w-full rounded-lg border border-brand-border px-2 py-1.5 text-sm text-brand-dark outline-none focus:border-brand-cta disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {FINAL_YEAR_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-brand-muted">
+                  {years < 2
+                    ? "An option goes on the final year, so the offer needs at least two years."
+                    : `Applies to ${seasonLabel(rows[rows.length - 1].seasonStartYear)}.`}
+                </p>
+              </div>
+
               <div className="grid gap-2 sm:grid-cols-2">
                 {TERM_NOTES.map((term) => (
                   <p
@@ -435,7 +476,8 @@ export default function OfferSheetModal({
                 {rows.map((row, index) => (
                   <label key={row.seasonStartYear} className="block">
                     <span className="text-xs text-brand-muted">
-                      {seasonLabel(row.seasonStartYear)} · of {money(row.salary)}
+                      {seasonLabel(row.seasonStartYear)} · of{" "}
+                      {money(row.salary)}
                     </span>
                     <input
                       type="number"
@@ -510,6 +552,7 @@ export default function OfferSheetModal({
                   raisePct: isTwoWay ? 0 : raisePct,
                   contractType,
                   signedVia: isTwoWay ? "capSpace" : signedVia,
+                  finalYearOption: finalYearOption || undefined,
                   // Sent only when the type asks for it, and always one figure
                   // per season so the server's length check reads true.
                   guaranteedAmounts: isPartial

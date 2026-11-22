@@ -7,7 +7,8 @@ import { TIER_LABEL, type Tier } from "@/lib/store/api/endpoints/salaryApi";
 import TeamLogo from "@/components/ui/TeamLogo";
 
 /** The trade center shows whole dollars, never an abbreviated figure. */
-const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
+const money = (value: number) =>
+  `$${Math.round(value).toLocaleString("en-US")}`;
 
 const signed = (value: number) =>
   `${value >= 0 ? "+" : "-"}${money(Math.abs(value))}`;
@@ -21,6 +22,12 @@ export type PickedAsset = {
   /** Null until a destination is chosen, which only matters above two teams. */
   toTeamId: number | null;
   leaguePlayerId?: number;
+  /**
+   * The player himself, not this league's copy of him. Only the global id
+   * opens his card, and an owner pricing a trade wants to read it without
+   * leaving the builder.
+   */
+  playerId?: number;
   tradeExceptionId?: number;
   draftPickId?: number;
   label: string;
@@ -116,6 +123,7 @@ export default function TeamPanel({
   onRemoveAsset,
   onRetarget,
   onProtect,
+  onOpenPlayer,
   onRemoveTeam,
   canRemoveTeam,
 }: {
@@ -132,11 +140,16 @@ export default function TeamPanel({
   onRetarget: (asset: PickedAsset, toTeamId: number) => void;
   /** Rules 12.5-12.7 — the pick's agreed terms changed on the card. */
   onProtect: (asset: PickedAsset, terms: ProtectionTerms) => void;
+  /** Opens a player's card from his name in the deal. */
+  onOpenPlayer: (playerId: number) => void;
   onRemoveTeam: () => void;
   canRemoveTeam: boolean;
 }) {
   const sendingTotal = sending.reduce((sum, asset) => sum + asset.salary, 0);
-  const receivingTotal = receiving.reduce((sum, asset) => sum + asset.salary, 0);
+  const receivingTotal = receiving.reduce(
+    (sum, asset) => sum + asset.salary,
+    0,
+  );
 
   const tier = evaluation?.tier ?? "capNotSet";
 
@@ -199,6 +212,7 @@ export default function TeamPanel({
             onRemove={() => onRemoveAsset(asset)}
             onRetarget={(toTeamId) => onRetarget(asset, toTeamId)}
             onProtect={(terms) => onProtect(asset, terms)}
+            onOpenPlayer={onOpenPlayer}
           />
         ))}
 
@@ -214,9 +228,20 @@ export default function TeamPanel({
                 className="flex items-center justify-between gap-2 rounded-lg border border-brand-border px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-brand-dark">
-                    {asset.label}
-                  </p>
+                  {asset.kind === "player" && asset.playerId !== undefined ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenPlayer(asset.playerId as number)}
+                      title={`Open ${asset.label}'s card`}
+                      className="block max-w-full truncate text-left text-sm font-medium text-brand-dark underline decoration-dotted"
+                    >
+                      {asset.label}
+                    </button>
+                  ) : (
+                    <p className="truncate text-sm font-medium text-brand-dark">
+                      {asset.label}
+                    </p>
+                  )}
                   {asset.salary > 0 ? (
                     <p className="text-[11px] text-brand-muted">
                       {money(asset.salary)}
@@ -382,15 +407,24 @@ function AssetRow({
   onRemove,
   onRetarget,
   onProtect,
+  onOpenPlayer,
 }: {
   asset: PickedAsset;
   otherTeams: TeamCard[];
   onRemove: () => void;
   onRetarget: (toTeamId: number) => void;
   onProtect: (terms: ProtectionTerms) => void;
+  /** Opens the player card. Null for an asset that is not a player. */
+  onOpenPlayer: ((playerId: number) => void) | null;
 }) {
   const [open, setOpen] = useState(false);
   const isPick = asset.kind === "draftPick";
+  // A player's row opens his card; a pick's row folds out its terms; an
+  // exception's row does neither.
+  const cardFor =
+    asset.kind === "player" && asset.playerId !== undefined && onOpenPlayer
+      ? asset.playerId
+      : null;
   const protectedPick = Boolean(asset.protectedTopN);
 
   // Rule 12.7 — a rollover has to name a year after the draft the pick is in.
@@ -412,12 +446,21 @@ function AssetRow({
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
-          disabled={!isPick}
-          onClick={() => setOpen((value) => !value)}
+          disabled={!isPick && cardFor === null}
+          onClick={() =>
+            cardFor !== null
+              ? onOpenPlayer?.(cardFor)
+              : setOpen((value) => !value)
+          }
           aria-expanded={isPick ? open : undefined}
+          title={cardFor !== null ? `Open ${asset.label}'s card` : undefined}
           className="min-w-0 flex-1 text-left disabled:cursor-default"
         >
-          <p className="truncate text-sm font-medium text-brand-dark">
+          <p
+            className={`truncate text-sm font-medium text-brand-dark ${
+              cardFor !== null ? "underline decoration-dotted" : ""
+            }`}
+          >
             {asset.label}
             {asset.sub ? (
               <span className="ml-1.5 text-[10px] font-semibold text-brand-muted">
@@ -534,8 +577,7 @@ function AssetRow({
                   value={asset.protectionOutcome ?? "convert"}
                   onChange={(e) =>
                     setTerms({
-                      protectionOutcome: e.target
-                        .value as ProtectionOutcome,
+                      protectionOutcome: e.target.value as ProtectionOutcome,
                       protectionFinalYear:
                         e.target.value === "rollover"
                           ? (asset.protectionFinalYear ??
@@ -561,9 +603,7 @@ function AssetRow({
                     Conveys unprotected in
                   </span>
                   <select
-                    value={
-                      asset.protectionFinalYear ?? rolloverYears[0]
-                    }
+                    value={asset.protectionFinalYear ?? rolloverYears[0]}
                     onChange={(e) =>
                       setTerms({
                         protectionFinalYear: Number(e.target.value),

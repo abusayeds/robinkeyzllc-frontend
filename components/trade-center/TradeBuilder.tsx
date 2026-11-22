@@ -14,6 +14,7 @@ import {
 } from "@/lib/store/api/endpoints/tradeApi";
 import AddAssetModal from "./AddAssetModal";
 import AddTeamModal from "./AddTeamModal";
+import PlayerDetailModal from "@/components/my-team/PlayerDetailModal";
 import ConfirmTradeModal from "./ConfirmTradeModal";
 import TeamPanel, {
   assetKey,
@@ -23,7 +24,8 @@ import TeamPanel, {
 } from "./TeamPanel";
 import TradeValidation from "./TradeValidation";
 
-const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
+const money = (value: number) =>
+  `$${Math.round(value).toLocaleString("en-US")}`;
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -77,6 +79,8 @@ export default function TradeBuilder({
   const [addingTeam, setAddingTeam] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // The player whose card is open, read from a name in the deal.
+  const [cardPlayerId, setCardPlayerId] = useState<number | null>(null);
 
   const [evaluation, setEvaluation] = useState<TradeEvaluation | null>(null);
   const [evaluateError, setEvaluateError] = useState<string | null>(null);
@@ -115,10 +119,7 @@ export default function TradeBuilder({
   );
 
   const inTrade = useMemo(
-    () =>
-      teamIds
-        .map(cardOf)
-        .filter((card): card is TeamCard => card !== null),
+    () => teamIds.map(cardOf).filter((card): card is TeamCard => card !== null),
     [teamIds, cardOf],
   );
 
@@ -191,7 +192,9 @@ export default function TradeBuilder({
 
   const addTeam = (teamId: number) => {
     setTeamIds((prev) =>
-      prev.includes(teamId) || prev.length >= MAX_TEAMS ? prev : [...prev, teamId],
+      prev.includes(teamId) || prev.length >= MAX_TEAMS
+        ? prev
+        : [...prev, teamId],
     );
     setAddingTeam(false);
   };
@@ -390,8 +393,11 @@ export default function TradeBuilder({
             onRemoveAsset={removeAsset}
             onRetarget={retarget}
             onProtect={protect}
+            onOpenPlayer={setCardPlayerId}
             onRemoveTeam={() => removeTeam(team.id)}
-            canRemoveTeam={teamIds.length > 2}
+            // Any partner can be swapped out, two-team deals included. Only
+            // your own team is fixed: a trade without it is not yours to make.
+            canRemoveTeam={team.id !== myTeamId}
           />
         ))}
       </div>
@@ -469,6 +475,14 @@ export default function TradeBuilder({
         recordOf={(teamId) => placeOf.get(teamId)?.record ?? null}
         onPick={addTeam}
         onClose={() => setAddingTeam(false)}
+      />
+
+      {/* Reading a player's stats and contract without leaving the builder,
+          which is how the deal was priced in the frontend phase. */}
+      <PlayerDetailModal
+        playerId={cardPlayerId}
+        leagueId={leagueId}
+        onClose={() => setCardPlayerId(null)}
       />
 
       <ConfirmTradeModal

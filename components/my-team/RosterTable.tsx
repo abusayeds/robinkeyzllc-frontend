@@ -6,8 +6,7 @@ import {
   SLOT_LABEL,
   type RosterPlayer,
 } from "@/lib/store/api/endpoints/rosterApi";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const initials = (name: string) =>
   name

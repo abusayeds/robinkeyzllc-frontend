@@ -15,7 +15,8 @@ import {
 import TeamLogo from "@/components/ui/TeamLogo";
 import TradeDetailsModal from "./TradeDetailsModal";
 
-const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
+const money = (value: number) =>
+  `$${Math.round(value).toLocaleString("en-US")}`;
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -330,6 +331,7 @@ export default function PendingTradesTab({
       <TradeDetailsModal
         trade={detail ?? null}
         evaluation={detail?.evaluation ?? null}
+        leagueId={leagueId}
         myTeamId={myTeamId}
         busy={busy}
         canRespond={
@@ -341,8 +343,7 @@ export default function PendingTradesTab({
         }
         canWithdraw={
           detail
-            ? detail.proposedBy?.id === userId &&
-              OPEN.includes(detail.status)
+            ? detail.proposedBy?.id === userId && OPEN.includes(detail.status)
             : false
         }
         onClose={() => setOpenId(null)}

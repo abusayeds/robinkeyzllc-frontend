@@ -63,6 +63,9 @@ export type SalaryContract = {
   signedVia: string;
   slotType: SlotType;
   birdYears: number;
+  /** Rule 10.11 — not in the NBA feed; AVORA counts it and it can be corrected. */
+  yearsOfService: number | null;
+  yearsOfServiceEstimated: boolean;
   isRightsHeld: boolean;
   startSeasonStartYear: number;
   endSeasonStartYear: number;
@@ -201,10 +204,53 @@ export const salaryApi = baseApi.injectEndpoints({
         { type: "Rosters" as const, id: leagueId },
       ],
     }),
+    /**
+     * Bird years and experience, neither of which the NBA feed carries.
+     *
+     * Bird years belong to this league's copy of the player; years of service
+     * belongs to the player and is shared by every league. Either may be sent
+     * on its own.
+     */
+    editPlayerService: builder.mutation<
+      {
+        leaguePlayerId: number;
+        playerName: string;
+        birdYears: number | null;
+        yearsOfService: number | null;
+      },
+      {
+        leagueId: number;
+        leaguePlayerId: number;
+        birdYears?: number;
+        yearsOfService?: number;
+      }
+    >({
+      query: ({ leagueId, leaguePlayerId, ...body }) => ({
+        url: `/leagues/${leagueId}/salaries/players/${leaguePlayerId}/service`,
+        method: "PATCH",
+        body,
+      }),
+      transformResponse: (
+        r: ApiResponse<{
+          leaguePlayerId: number;
+          playerName: string;
+          birdYears: number | null;
+          yearsOfService: number | null;
+        }>,
+      ) => unwrap(r),
+      invalidatesTags: (_result, _error, { leagueId }) => [
+        { type: "Salaries" as const, id: leagueId },
+        { type: "Rosters" as const, id: leagueId },
+      ],
+    }),
   }),
 });
 
-export const { useLeagueSalariesQuery, useEditContractMutation } = salaryApi;
+export const {
+  useLeagueSalariesQuery,
+  useEditContractMutation,
+  useEditPlayerServiceMutation,
+} = salaryApi;
 
 /** Article 4 — the two ceilings a move can buy. */
 export type HardCapApron = "firstApron" | "secondApron";
@@ -222,9 +268,6 @@ export type TeamHardCap = {
   apron: HardCapApron | null;
   apronLabel: string | null;
   ceiling: number | null;
-  /** Rule 4.8 — spots still to fill before the league's roster minimum. */
-  openSpots: number;
-  reserve: number;
   committed: number;
   room: number | null;
   pass: boolean;
@@ -264,6 +307,8 @@ export type OutlookSeason = {
   deadMoney: number;
   capHolds: number;
   committed: number;
+  /** The cap this season is measured against, or 0 when none is entered. */
+  salaryCap: number;
   capSpace: number | null;
   playerCount: number;
 };
@@ -277,8 +322,13 @@ export type PayrollOutlook = {
     logo: string | null;
   };
   firstSeasonStartYear: number;
+  /** This season's cap. Each season below carries its own. */
   salaryCap: number;
-  /** One cap covers every season, because a league stores only one. */
+  /**
+   * True only while a league still holds one cap for every season. Article 2
+   * stores a cap per league year, so a season the Super Admin has not entered
+   * reads 0 and the page shows a dash rather than this year's figure.
+   */
   capIsCurrentSeasonOnly: boolean;
   seasons: OutlookSeason[];
 };

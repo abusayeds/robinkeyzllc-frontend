@@ -1,6 +1,9 @@
 "use client";
 
-import type { NewsPayload, NewsTeamLeg } from "@/lib/store/api/endpoints/newsApi";
+import type {
+  NewsPayload,
+  NewsTeamLeg,
+} from "@/lib/store/api/endpoints/newsApi";
 import TeamLogo from "@/components/ui/TeamLogo";
 
 /**
@@ -11,9 +14,10 @@ import TeamLogo from "@/components/ui/TeamLogo";
  */
 
 /** Abbreviated, because a post is read at a glance. */
-const money = (value: number) => {
+const money = (value: number | null | undefined) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
   const millions = value / 1_000_000;
-  return `$${millions >= 100 ? Math.round(millions) : millions.toFixed(1)}M`;
+  return `${millions >= 100 ? Math.round(millions) : millions.toFixed(1)}M`;
 };
 
 const signed = (value: number) =>
@@ -164,7 +168,8 @@ export default function BreakingNews({ payload }: { payload: NewsPayload }) {
           </p>
           <ul className="divide-y divide-brand-border">
             {withCap.map((team) => {
-              const change = (team.capAfter as number) - (team.capBefore as number);
+              const change =
+                (team.capAfter as number) - (team.capBefore as number);
               return (
                 <li
                   key={team.teamId}

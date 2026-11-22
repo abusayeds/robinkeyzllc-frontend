@@ -5,8 +5,7 @@ import type {
   ContractSeason,
   RosterPlayer,
 } from "@/lib/store/api/endpoints/rosterApi";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const short = (value: number) => {
   if (Math.abs(value) >= 1_000_000)
@@ -18,13 +17,54 @@ const short = (value: number) => {
 const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 
-/** The file's own shorthand, so the table reads like the import sheet. */
-const tagFor = (season: ContractSeason): string | null => {
-  if (season.optionType === "player") return "PO";
-  if (season.optionType === "team") return "TO";
-  if (season.optionType === "earlyTermination") return "ETO";
-  if (season.guaranteeType === "none") return "NG";
-  if (season.guaranteeType === "partial") return "PG";
+/** Frontend-phase legend — same dots/labels as old-design-reference. */
+const LEGEND: { label: string; dot: string }[] = [
+  { label: "Player Option", dot: "bg-blue-500" },
+  { label: "Team Option", dot: "bg-brand-cta" },
+  { label: "Non-Guaranteed", dot: "bg-amber-500" },
+  { label: "Partial Guarantee", dot: "bg-amber-400" },
+  { label: "Dead Cap", dot: "bg-red-500" },
+  { label: "Cap Hold", dot: "bg-brand-muted" },
+];
+
+type SeasonTag = {
+  label: string;
+  text: string;
+  chip: string;
+};
+
+/** The file's own shorthand, colored like the frontend-phase contracts page. */
+const tagFor = (season: ContractSeason): SeasonTag | null => {
+  if (season.optionType === "player")
+    return {
+      label: "PO",
+      text: "text-blue-600",
+      chip: "bg-blue-50 text-blue-700",
+    };
+  if (season.optionType === "team")
+    return {
+      label: "TO",
+      text: "text-brand-cta-dark",
+      chip: "bg-brand-soft text-brand-cta-dark",
+    };
+  if (season.optionType === "earlyTermination")
+    return {
+      label: "ETO",
+      text: "text-brand-muted",
+      chip: "bg-brand-soft text-brand-muted",
+    };
+  if (season.guaranteeType === "none")
+    return {
+      label: "NG",
+      text: "text-amber-600",
+      chip: "bg-amber-50 text-amber-700",
+    };
+  if (season.guaranteeType === "partial")
+    return {
+      label: "PG",
+      text: "text-amber-600",
+      chip: "bg-amber-50 text-amber-700",
+    };
   return null;
 };
 
@@ -33,11 +73,13 @@ function SeasonCell({ season }: { season: ContractSeason | undefined }) {
   const tag = tagFor(season);
 
   return (
-    <span className="whitespace-nowrap">
+    <span className={`whitespace-nowrap ${tag?.text ?? "text-brand-dark"}`}>
       {short(season.capHit)}
       {tag ? (
-        <span className="ml-1 rounded bg-brand-soft px-1 py-0.5 text-[9px] font-bold text-brand-muted">
-          {tag}
+        <span
+          className={`ml-1 rounded px-1 py-0.5 text-[9px] font-bold ${tag.chip}`}
+        >
+          {tag.label}
         </span>
       ) : null}
     </span>
@@ -76,7 +118,17 @@ export default function ContractsTable({
   );
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-brand-border bg-white shadow-card">
+    <div className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-muted">
+        {LEGEND.map((item) => (
+          <span key={item.label} className="flex items-center gap-1.5">
+            <span className={`h-2 w-2 rounded-full ${item.dot}`} />
+            {item.label}
+          </span>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-brand-border bg-white shadow-card">
       <table className="w-full min-w-[760px] text-sm">
         <thead className="bg-brand-soft/60 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
           <tr>
@@ -183,7 +235,8 @@ export default function ContractsTable({
         <div className="grid gap-4 border-t border-brand-border px-4 py-3 sm:grid-cols-2">
           {deadMoneyRows.length > 0 ? (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-red-600">
+                <span className="h-2 w-2 rounded-full bg-red-500" />
                 Dead money this season
               </p>
               <ul className="mt-1.5 space-y-1">
@@ -193,7 +246,9 @@ export default function ContractsTable({
                     className="flex justify-between text-xs text-brand-muted"
                   >
                     <span className="text-brand-dark">{row.name}</span>
-                    <span>{money(row.amount)}</span>
+                    <span className="font-medium text-red-600">
+                      {money(row.amount)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -201,7 +256,8 @@ export default function ContractsTable({
           ) : null}
           {capHoldRows.length > 0 ? (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
+                <span className="h-2 w-2 rounded-full bg-brand-muted" />
                 Cap holds this season
               </p>
               <ul className="mt-1.5 space-y-1">
@@ -221,6 +277,7 @@ export default function ContractsTable({
           ) : null}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

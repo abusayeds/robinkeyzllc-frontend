@@ -1,12 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  FiAlertTriangle,
-  FiCheck,
-  FiSearch,
-  FiX,
-} from "react-icons/fi";
+import { FiAlertTriangle, FiCheck, FiSearch, FiX } from "react-icons/fi";
 import {
   OFFER_STATUS_LABEL,
   OFFER_STATUS_TONE,
@@ -18,8 +13,7 @@ import {
 } from "@/lib/store/api/endpoints/freeAgencyApi";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
-
-const money = (value: number) => `$${value.toLocaleString("en-US")}`;
+import { money } from "@/lib/money";
 
 const errorText = (error: unknown, fallback: string) => {
   const message = (error as { data?: { message?: string } })?.data?.message;
@@ -182,7 +176,10 @@ function OfferCard({
             </p>
             <ul className="mt-1.5 space-y-1">
               {offer.checks.map((check) => (
-                <li key={check.label} className="flex items-start gap-2 text-xs">
+                <li
+                  key={check.label}
+                  className="flex items-start gap-2 text-xs"
+                >
                   {check.pass ? (
                     <FiCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-cta-dark" />
                   ) : (
@@ -297,7 +294,9 @@ export default function FreeAgencyManagementPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-brand-dark">
-                {data.windowOpen ? "Free agency is open" : "Free agency is closed"}
+                {data.windowOpen
+                  ? "Free agency is open"
+                  : "Free agency is closed"}
               </p>
               <p className="text-[11px] text-brand-muted">
                 {data.window
@@ -357,9 +356,7 @@ export default function FreeAgencyManagementPage() {
       ) : null}
 
       {!isLoading && offers.length === 0 && (data?.offers.length ?? 0) > 0 ? (
-        <p className="text-sm text-brand-muted">
-          No offers match that filter.
-        </p>
+        <p className="text-sm text-brand-muted">No offers match that filter.</p>
       ) : null}
 
       <div className="space-y-3">

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,6 +13,7 @@ import {
   type LeagueVisibility,
   type ScoringType,
 } from "@/lib/store/api";
+import { useModalShell } from "@/lib/useModalShell";
 
 const SCORING_TYPES = Object.keys(SCORING_TYPE_LABEL) as ScoringType[];
 const DRAFT_TYPES = Object.keys(DRAFT_TYPE_LABEL) as DraftType[];
@@ -45,26 +45,14 @@ export default function CreateLeagueModal({
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
 
+  // A fresh form every time the modal is opened.
   useEffect(() => {
     if (!open) return;
-
     setForm(emptyForm);
     setError(null);
+  }, [open]);
 
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-
-    window.addEventListener("keydown", onKey);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  useModalShell(open, onClose);
 
   if (!open) return null;
 
