@@ -183,12 +183,16 @@ function LegAssetsCard({
 }
 
 /**
- * Where the trade leaves one team, current against after.
- *
- * Built from the live evaluation rather than from figures frozen at proposal
- * time, so an owner weighing an offer today sees today's books.
+ * Frontend-phase Cap Impact card + live evaluation numbers.
+ * Roster "counts" rows are left off (V2 / design) — validation covers roster rules.
  */
-function CapImpactCard({ team }: { team: TradeEvaluation["teams"][number] }) {
+function CapImpactCard({
+  team,
+  logo,
+}: {
+  team: TradeEvaluation["teams"][number];
+  logo: string | null;
+}) {
   const netTone =
     team.capImpact > 0
       ? "text-red-500"
@@ -199,6 +203,11 @@ function CapImpactCard({ team }: { team: TradeEvaluation["teams"][number] }) {
   return (
     <div className="min-w-[190px] rounded-lg border border-brand-border p-3">
       <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-brand-dark">
+        <TeamLogo
+          name={team.teamName}
+          src={logo}
+          className="h-5 w-5 shrink-0"
+        />
         <span className="min-w-0 truncate">{team.teamName}</span>
         {team.tierChanged ? (
           <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
@@ -241,17 +250,11 @@ function CapImpactCard({ team }: { team: TradeEvaluation["teams"][number] }) {
             </td>
           </tr>
           <tr>
-            <td className="py-1 text-brand-muted">Roster</td>
-            <td className="py-1 text-right text-brand-dark">
-              {team.rosterBefore}
-            </td>
-            <td className="py-1 text-right text-brand-dark">
-              {team.rosterAfter} of {team.maxRosterSize}
-            </td>
-            <td className="py-1 text-right font-semibold text-brand-dark">
-              {signed(team.rosterAfter - team.rosterBefore)
-                .replace("$", "")
-                .replace(/,/g, "")}
+            <td className="py-1 text-brand-muted">Net Salary</td>
+            <td className="py-1 text-right text-brand-muted">—</td>
+            <td className="py-1 text-right text-brand-muted">—</td>
+            <td className={`py-1 text-right font-semibold ${netTone}`}>
+              {signed(team.capImpact)}
             </td>
           </tr>
           <tr>
@@ -418,9 +421,16 @@ export default function TradeDetailsModal({
                   Post-Trade Cap Impact
                 </p>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3">
-                  {evaluation.teams.map((team) => (
-                    <CapImpactCard key={team.teamId} team={team} />
-                  ))}
+                  {evaluation.teams.map((team) => {
+                    const side = sides.find((row) => row.teamId === team.teamId);
+                    return (
+                      <CapImpactCard
+                        key={team.teamId}
+                        team={team}
+                        logo={side?.team.logo ?? null}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
@@ -430,6 +440,7 @@ export default function TradeDetailsModal({
                 Trade Validation
               </p>
               {evaluation ? (
+                // V2: frontend-phase placement + the new live validation wording
                 <TradeValidation
                   evaluation={evaluation}
                   busy={false}
@@ -449,6 +460,9 @@ export default function TradeDetailsModal({
                 <div className="rounded-lg border border-brand-border p-3">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-muted">
                     Message
+                    {trade.proposedBy?.name
+                      ? ` from ${trade.proposedBy.name}`
+                      : ""}
                   </p>
                   <div className="flex items-start gap-2">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand-muted">

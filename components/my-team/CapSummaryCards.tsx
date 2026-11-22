@@ -104,11 +104,17 @@ export default function CapSummaryCards({
     teamId,
   });
 
-  const salaryCap = settings?.salaryCap || cap.salaryCap;
+  // Roster API already went through CapService — prefer it over settings so a
+  // stale LeagueSettings.salaryCap of 0 cannot blank Cap Space again.
+  const salaryCap = cap.salaryCap || settings?.salaryCap || 0;
   const thresholds = settings?.thresholds;
   const committed = cap.committed;
   const capSpace =
-    cap.capSpace ?? (salaryCap > 0 ? salaryCap - committed : null);
+    cap.capSpace !== null && cap.capSpace !== undefined
+      ? cap.capSpace
+      : salaryCap > 0
+        ? salaryCap - committed
+        : null;
   const toTax =
     thresholds && salaryCap > 0 ? thresholds.luxuryTax - committed : null;
   const toFirst =

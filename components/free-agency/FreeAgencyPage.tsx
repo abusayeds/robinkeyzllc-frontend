@@ -13,6 +13,7 @@ import {
 } from "@/lib/store/api/endpoints/freeAgencyApi";
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useAppSelector } from "@/lib/store/hooks";
+import PlayerDetailModal from "@/components/my-team/PlayerDetailModal";
 import CapOverview from "./CapOverview";
 import CompetingOffersModal from "./CompetingOffersModal";
 import FreeAgentTable from "./FreeAgentTable";
@@ -23,6 +24,7 @@ import WithdrawOfferModal from "./WithdrawOfferModal";
 const TABS = ["All Players", "Signed Players", "Pending Offers"] as const;
 type Tab = (typeof TABS)[number];
 
+const ALL_POSITIONS = "All Positions";
 const TYPES = ["All Types", "UFA", "RFA"] as const;
 
 const errorText = (error: unknown, fallback: string) => {
@@ -58,11 +60,23 @@ export default function FreeAgencyPage() {
 
   const [tab, setTab] = useState<Tab>("All Players");
   const [search, setSearch] = useState("");
+  const [position, setPosition] = useState(ALL_POSITIONS);
   const [type, setType] = useState<string>(TYPES[0]);
   const [offerFor, setOfferFor] = useState<FreeAgent | null>(null);
   const [viewOffers, setViewOffers] = useState<FreeAgent | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<Offer | null>(null);
+  const [detailPlayerId, setDetailPlayerId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Positions the pool actually has (G / F / C / pairs) — not the five the
+  // design drew from a different data source.
+  const positions = useMemo(() => {
+    const set = new Set<string>();
+    for (const player of pool?.players ?? []) {
+      if (player.position) set.add(player.position);
+    }
+    return [ALL_POSITIONS, ...[...set].sort()];
+  }, [pool]);
 
   const players = useMemo(() => {
     const all = pool?.players ?? [];
@@ -70,10 +84,12 @@ export default function FreeAgencyPage() {
 
     return all.filter((player) => {
       if (needle && !player.name.toLowerCase().includes(needle)) return false;
+      if (position !== ALL_POSITIONS && player.position !== position)
+        return false;
       if (type !== TYPES[0] && player.faType !== type) return false;
       return true;
     });
-  }, [pool, search, type]);
+  }, [pool, search, position, type]);
 
   const myOffers = useMemo(
     () =>
@@ -190,6 +206,15 @@ export default function FreeAgencyPage() {
               />
             </div>
             <select
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              className="rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-brand-cta"
+            >
+              {positions.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+            <select
               value={type}
               onChange={(e) => setType(e.target.value)}
               className="rounded-lg border border-brand-border bg-white px-3 py-2 text-sm outline-none focus:border-brand-cta"
@@ -221,6 +246,7 @@ export default function FreeAgencyPage() {
                 canOffer={Boolean(myTeamId)}
                 onOffer={setOfferFor}
                 onViewOffers={setViewOffers}
+                onViewPlayer={(player) => setDetailPlayerId(player.playerId)}
               />
               {!myTeamId ? (
                 <p className="text-xs text-brand-muted">
@@ -281,6 +307,12 @@ export default function FreeAgencyPage() {
         busy={withdrawing}
         onClose={() => setWithdrawTarget(null)}
         onConfirm={() => void confirmWithdraw()}
+      />
+
+      <PlayerDetailModal
+        playerId={detailPlayerId}
+        leagueId={leagueId}
+        onClose={() => setDetailPlayerId(null)}
       />
     </div>
   );

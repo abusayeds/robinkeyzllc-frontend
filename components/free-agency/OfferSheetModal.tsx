@@ -47,12 +47,12 @@ const FINAL_YEAR_OPTIONS = [
  */
 const TERM_NOTES: { label: string; note: string }[] = [
   {
-    label: "Partial Guarantee",
-    note: "Choose Partially Guaranteed as the contract type and name each season below.",
+    label: "Player / Team Option",
+    note: "Use Final Year Option above (needs a 2+ year deal).",
   },
   {
-    label: "No Trade Clause",
-    note: "Not part of the V1 rules. The rule book does not define one.",
+    label: "Partial Guarantee",
+    note: "Set Contract Type to Partially Guaranteed, then enter each season’s guaranteed amount below.",
   },
 ];
 

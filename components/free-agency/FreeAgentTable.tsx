@@ -11,11 +11,13 @@ export default function FreeAgentTable({
   canOffer,
   onOffer,
   onViewOffers,
+  onViewPlayer,
 }: {
   players: FreeAgent[];
   canOffer: boolean;
   onOffer: (player: FreeAgent) => void;
   onViewOffers: (player: FreeAgent) => void;
+  onViewPlayer?: (player: FreeAgent) => void;
 }) {
   if (players.length === 0) {
     return (
@@ -47,20 +49,49 @@ export default function FreeAgentTable({
             return (
               <tr key={player.leaguePlayerId}>
                 <td className="px-4 py-2.5">
-                  <p className="font-medium text-brand-dark">{player.name}</p>
-                  <p className="text-[11px] text-brand-muted">
-                    {[
-                      player.position,
-                      player.nbaTeam,
-                      player.experience !== null
-                        ? `${player.experience} yr${player.experience === 1 ? "" : "s"}${
-                            player.experienceIsEstimated ? "*" : ""
-                          }`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                  {onViewPlayer ? (
+                    <button
+                      type="button"
+                      onClick={() => onViewPlayer(player)}
+                      className="text-left"
+                    >
+                      <p className="font-medium text-brand-dark hover:text-brand-cta-dark hover:underline">
+                        {player.name}
+                      </p>
+                      <p className="text-[11px] text-brand-muted">
+                        {[
+                          player.position,
+                          player.nbaTeam,
+                          player.experience !== null
+                            ? `${player.experience} yr${player.experience === 1 ? "" : "s"}${
+                                player.experienceIsEstimated ? "*" : ""
+                              }`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </button>
+                  ) : (
+                    <>
+                      <p className="font-medium text-brand-dark">
+                        {player.name}
+                      </p>
+                      <p className="text-[11px] text-brand-muted">
+                        {[
+                          player.position,
+                          player.nbaTeam,
+                          player.experience !== null
+                            ? `${player.experience} yr${player.experience === 1 ? "" : "s"}${
+                                player.experienceIsEstimated ? "*" : ""
+                              }`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
                   <span

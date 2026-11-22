@@ -139,10 +139,16 @@ export default function TeamDetailModal({
 
         <div className="flex flex-wrap gap-2 border-t border-brand-border px-5 py-4">
           <Link
+            href="/dashboard"
+            className="flex-1 rounded-lg border border-brand-border px-3 py-2 text-center text-sm font-semibold text-brand-dark transition hover:bg-brand-soft"
+          >
+            Team Dashboard
+          </Link>
+          <Link
             href="/my-team/contracts"
             className="flex-1 rounded-lg border border-brand-border px-3 py-2 text-center text-sm font-semibold text-brand-dark transition hover:bg-brand-soft"
           >
-            View Roster
+            Contracts
           </Link>
           <Link
             href="/league/trade-finder"

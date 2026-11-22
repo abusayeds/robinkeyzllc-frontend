@@ -30,7 +30,6 @@ import {
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import {
   useCategoryTotalsQuery,
-  useLeagueMatchupsQuery,
   useLeagueStandingsQuery,
 } from "@/lib/store/api/endpoints/standingsApi";
 import { TIER_TONE } from "@/lib/store/api/endpoints/salaryApi";
@@ -260,11 +259,6 @@ export default function DashboardPage() {
     { skip: !leagueId },
   );
 
-  const { data: schedule } = useLeagueMatchupsQuery(
-    { leagueId: leagueId as number },
-    { skip: !leagueId },
-  );
-
   const { data: totals } = useCategoryTotalsQuery(
     { leagueId: leagueId as number, range: { kind: "ytd" } },
     { skip: !leagueId },
@@ -323,18 +317,6 @@ export default function DashboardPage() {
       };
     });
   }, [totals, myTeamId]);
-
-  /** This week's matchups, whichever week the league is in. */
-  const weekMatchups = useMemo(() => {
-    const week = schedule?.currentWeek ?? 0;
-    if (!week) return [];
-    return (schedule?.matchups ?? []).filter((row) => row.week === week);
-  }, [schedule]);
-
-  const teamsById = useMemo(
-    () => new Map((schedule?.teams ?? []).map((team) => [team.id, team])),
-    [schedule],
-  );
 
   if (!leagueId) {
     return (

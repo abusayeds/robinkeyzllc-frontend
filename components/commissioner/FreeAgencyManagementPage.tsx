@@ -89,6 +89,11 @@ function OfferCard({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-muted">
               {offer.years} year{offer.years === 1 ? "" : "s"}
               {offer.raisePct ? ` · ${offer.raisePct}% raises` : ""}
+              {offer.finalYearOption === "player"
+                ? " · Player Option"
+                : offer.finalYearOption === "team"
+                  ? " · Team Option"
+                  : ""}
             </p>
             <p className="text-sm font-semibold text-brand-dark">
               {money(offer.totalValue)}

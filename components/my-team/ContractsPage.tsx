@@ -24,7 +24,8 @@ import TeamSelector from "./TeamSelector";
 import { useViewedTeam } from "./viewedTeam";
 
 /** How many seasons the contract grid shows, matching the import template. */
-const SEASON_COLUMNS = 6;
+/** Match Payroll Simulator / league pick window (default 7 seasons). */
+const SEASON_COLUMNS = 7;
 
 export default function ContractsPage() {
   const pathname = usePathname();

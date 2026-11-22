@@ -542,7 +542,10 @@ export const tradeFinderApi = baseApi.injectEndpoints({
     tradeFinder: builder.query<TradeFinderListing, { leagueId: number }>({
       query: ({ leagueId }) => `/leagues/${leagueId}/trades/finder`,
       transformResponse: (r: ApiResponse<TradeFinderListing>) => unwrap(r),
+      // TradeBlock too: listing/unlisting must refresh the finder, not only
+      // the block tab — otherwise a just-listed player stays invisible.
       providesTags: (_result, _error, { leagueId }) => [
+        { type: "TradeBlock" as const, id: leagueId },
         { type: "Rosters" as const, id: leagueId },
         { type: "Salaries" as const, id: leagueId },
       ],

@@ -1,6 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 
+/**
+ * V2 — the Avora mark fills the circle (not a small logo floating inside).
+ * Same cropped icon used elsewhere so the brand is one file.
+ */
 export default function AccountCreatedView() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-dark px-6">
@@ -14,14 +18,14 @@ export default function AccountCreatedView() {
       />
 
       <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-10 text-center backdrop-blur">
-  
-        <div className="relative mx-auto mb-6 h-16 w-16 overflow-hidden rounded-full bg-white/10">
+        <div className="relative mx-auto mb-6 h-20 w-20 overflow-hidden rounded-full bg-white">
           <Image
-            src="/image/logo-icon.png"
+            src="/image/logo-cropped.png"
             alt="AVORA"
             fill
-            sizes="64px"
-            className="object-cover p-1.5"
+            sizes="80px"
+            className="object-cover"
+            priority
           />
         </div>
 

@@ -9,6 +9,7 @@ import {
 } from "@/lib/store/api/endpoints/tradeApi";
 import { useLeagueTransactionsQuery } from "@/lib/store/api/endpoints/transactionsApi";
 import { useAppSelector } from "@/lib/store/hooks";
+import PlayerDetailModal from "@/components/my-team/PlayerDetailModal";
 import PlayerRow from "./PlayerRow";
 import TradeSidebar from "./TradeSidebar";
 
@@ -64,9 +65,8 @@ export default function TradeFinderPage() {
     { skip: !leagueId },
   );
 
-  // The sidebar's "Recently Listed" card: AVORA has no trade block, so it
-  // shows who has actually changed hands lately, which is the same question a
-  // manager shopping around is asking.
+  // Sidebar "Recently Listed": recent transactions as market context. The
+  // main board itself is trade-block only (server filters tradeBlockEntry).
   const { data: feed } = useLeagueTransactionsQuery(
     { leagueId: leagueId as number, take: 20 },
     { skip: !leagueId },
@@ -76,6 +76,7 @@ export default function TradeFinderPage() {
   const [position, setPosition] = useState<string>(ALL_POSITIONS);
   const [salary, setSalary] = useState<string>(SALARY[0]);
   const [age, setAge] = useState<string>(AGE[0]);
+  const [detailPlayerId, setDetailPlayerId] = useState<number | null>(null);
 
   // A watchlist is the viewer's own scratch note, so it lives in the page
   // rather than on the server.
@@ -189,7 +190,7 @@ export default function TradeFinderPage() {
       <div>
         <h1 className="text-xl font-bold text-brand-dark">Trade Finder</h1>
         <p className="text-sm text-brand-muted">
-          Browse rosters league-wide and start a trade with any team.
+          Players teams have listed on the trade block — start a deal from here.
         </p>
       </div>
 
@@ -230,7 +231,7 @@ export default function TradeFinderPage() {
             ) : filtered.length === 0 ? (
               <p className="px-5 py-10 text-center text-sm text-brand-muted">
                 {available.length === 0
-                  ? "No other team has a rostered player yet."
+                  ? "No players are listed on the trade block yet."
                   : "No players match your filters."}
               </p>
             ) : (
@@ -241,7 +242,7 @@ export default function TradeFinderPage() {
                     player={player}
                     saved={savedIds.has(player.id)}
                     onToggleSave={() => toggleSave(player)}
-                    onOpenDetail={() => openBuilder(player)}
+                    onOpenDetail={() => setDetailPlayerId(player.playerId)}
                     onTrade={() => openBuilder(player)}
                   />
                 ))}
@@ -258,6 +259,12 @@ export default function TradeFinderPage() {
           }
         />
       </div>
+
+      <PlayerDetailModal
+        playerId={detailPlayerId}
+        leagueId={leagueId}
+        onClose={() => setDetailPlayerId(null)}
+      />
     </div>
   );
 }

@@ -54,7 +54,40 @@ export const capYearApi = baseApi.injectEndpoints({
       transformResponse: (r: ApiResponse<CapYear>) => unwrap(r),
       invalidatesTags: ["CapYears"],
     }),
+
+    /**
+     * Global NBA contract database for Startup Draft.
+     * balldontlie has no contract endpoint — Super Admin loads rows here.
+     */
+    loadContractReferences: builder.mutation<
+      { written: number; skippedUnknownPlayers: number[] },
+      {
+        rows: {
+          bdlPlayerId: number;
+          seasonStartYear: number;
+          salary: number;
+          optionType?: string | null;
+          guaranteeType?: string;
+          guaranteedAmount?: number | null;
+          endSeasonStartYear?: number;
+          source?: string;
+        }[];
+      }
+    >({
+      query: (body) => ({
+        url: `/cap/contracts`,
+        method: "PUT",
+        body,
+      }),
+      transformResponse: (
+        r: ApiResponse<{ written: number; skippedUnknownPlayers: number[] }>,
+      ) => unwrap(r),
+    }),
   }),
 });
 
-export const { useCapYearsQuery, useSaveCapYearMutation } = capYearApi;
+export const {
+  useCapYearsQuery,
+  useSaveCapYearMutation,
+  useLoadContractReferencesMutation,
+} = capYearApi;

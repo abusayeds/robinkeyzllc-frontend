@@ -101,7 +101,9 @@ export const dashboardNav: NavSection[] = [
   {
     title: "MY TEAM",
     items: [
-      { label: "My Team", href: "/my-team", icon: HiOutlineUserGroup },
+      // V1: picking a team under My Team opens the Team Dashboard, not the
+      // roster page. Roster stays reachable from the dashboard / contracts.
+      { label: "My Team", href: "/dashboard", icon: HiOutlineUserGroup },
       {
         label: "Contracts",
         href: "/my-team/contracts",
@@ -255,6 +257,11 @@ export const adminNav: NavSection[] = [
         icon: HiOutlineCalculator,
       },
       {
+        label: "Player Contracts",
+        href: "/platform/contracts",
+        icon: HiOutlineDocumentText,
+      },
+      {
         label: "Player Birthdates",
         href: "/platform/birthdates",
         icon: TbCake,
@@ -311,6 +318,8 @@ export const pageSubtitles: Record<string, string> = {
   "/platform/leagues": "Here's what's happening across AVORA.",
   "/platform/salary-cap":
     "Enter each league year's figures. Every league runs on these unless it has entered its own.",
+  "/platform/contracts":
+    "Load the global contract database Startup Draft reads when a player is picked.",
   "/platform/birthdates":
     "Load player birthdates from a CSV. The NBA data feed does not carry them.",
   "/platform/settings": "Manage your admin profile and system configurations.",
@@ -342,6 +351,7 @@ export const pageTitles: Record<string, string> = {
   "/platform/users": "Users",
   "/platform/leagues": "Leagues",
   "/platform/salary-cap": "Salary Cap Settings",
+  "/platform/contracts": "Player Contracts",
   "/platform/birthdates": "Player Birthdates",
   "/platform/settings": "Settings",
   "/dashboard": "Dashboard",

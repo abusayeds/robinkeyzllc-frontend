@@ -34,6 +34,8 @@ export type Offer = {
   raisePct: number;
   contractType: string;
   signedVia: string;
+  /** Rule 10.6 — 'player' or 'team' on the final season, or null. */
+  finalYearOption: string | null;
   totalValue: number;
   /** What each year of the offer pays, worked out once on the server. */
   schedule: { yearIndex: number; salary: number }[];

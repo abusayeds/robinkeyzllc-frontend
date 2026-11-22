@@ -151,7 +151,7 @@ export type DraftSettings = {
     drafted: number;
     available: number;
     contractSource: string;
-    /** False until the contract endpoints are synced, so the column stays empty. */
+    /** False until the Super Admin has loaded PlayerContractReference rows. */
     contractsAvailable: boolean;
     /** How many players the global contract database has terms for. */
     contractsReferenced: number;
