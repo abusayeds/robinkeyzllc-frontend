@@ -94,6 +94,7 @@ export const baseApi = createApi({
     "DraftPool",
     "Standings",
     "Schedule",
+    "NbaSync",
   ],
   refetchOnReconnect: true,
   endpoints: () => ({}),

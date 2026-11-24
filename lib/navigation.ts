@@ -30,7 +30,7 @@ import {
   FiInfo,
 } from "react-icons/fi";
 import { RiExchangeFundsLine } from "react-icons/ri";
-import { LuBuilding2, LuUsers } from "react-icons/lu";
+import { LuBuilding2, LuRefreshCw, LuUsers } from "react-icons/lu";
 
 export type NavItem = {
   label: string;
@@ -266,6 +266,13 @@ export const adminNav: NavSection[] = [
         href: "/platform/birthdates",
         icon: TbCake,
       },
+      // Where the NBA feed is pulled in: season averages, career stats and
+      // the game-log backfill.
+      {
+        label: "NBA Data Sync",
+        href: "/platform/nba-data",
+        icon: LuRefreshCw,
+      },
     ],
   },
   {
@@ -322,6 +329,8 @@ export const pageSubtitles: Record<string, string> = {
     "Load the global contract database Startup Draft reads when a player is picked.",
   "/platform/birthdates":
     "Load player birthdates from a CSV. The NBA data feed does not carry them.",
+  "/platform/nba-data":
+    "Pull season averages, career stats, game lines and injuries from the NBA feed.",
   "/platform/settings": "Manage your admin profile and system configurations.",
   "/settings": "Manage your profile and your league's information pages.",
   "/settings/profile": "Your account details and password.",
@@ -353,6 +362,7 @@ export const pageTitles: Record<string, string> = {
   "/platform/salary-cap": "Salary Cap Settings",
   "/platform/contracts": "Player Contracts",
   "/platform/birthdates": "Player Birthdates",
+  "/platform/nba-data": "NBA Data Sync",
   "/platform/settings": "Settings",
   "/dashboard": "Dashboard",
   "/league/standings": "Standings",
