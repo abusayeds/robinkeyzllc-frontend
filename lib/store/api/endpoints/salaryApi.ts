@@ -217,12 +217,15 @@ export const salaryApi = baseApi.injectEndpoints({
         playerName: string;
         birdYears: number | null;
         yearsOfService: number | null;
+        birdRightsTeamId: number | null;
       },
       {
         leagueId: number;
         leaguePlayerId: number;
         birdYears?: number;
         yearsOfService?: number;
+        /** Null clears it; leaving it out keeps whatever is stored. */
+        birdRightsTeamId?: number | null;
       }
     >({
       query: ({ leagueId, leaguePlayerId, ...body }) => ({
@@ -236,11 +239,15 @@ export const salaryApi = baseApi.injectEndpoints({
           playerName: string;
           birdYears: number | null;
           yearsOfService: number | null;
+          birdRightsTeamId: number | null;
         }>,
       ) => unwrap(r),
       invalidatesTags: (_result, _error, { leagueId }) => [
         { type: "Salaries" as const, id: leagueId },
         { type: "Rosters" as const, id: leagueId },
+        // The commissioner edits these from the free agent list too, so that
+        // screen has to be told as well.
+        { type: "FreeAgency" as const, id: leagueId },
       ],
     }),
   }),
@@ -310,7 +317,37 @@ export type OutlookSeason = {
   /** The cap this season is measured against, or 0 when none is entered. */
   salaryCap: number;
   capSpace: number | null;
+  /** Article 3 — the other lines, and the room under each. */
+  salaryFloor: number;
+  luxuryTax: number;
+  luxuryTaxRoom: number | null;
+  firstApron: number;
+  firstApronRoom: number | null;
+  secondApron: number;
+  secondApronRoom: number | null;
+  /** True when the figures were grown forward, not entered for this year. */
+  capIsProjected: boolean;
+  /** The payroll split four ways; the four add back up to `payroll`. */
+  guaranteed: number;
+  playerOptions: number;
+  teamOptions: number;
+  notGuaranteed: number;
+  /** Share of the payroll held by the three biggest contracts, as a percent. */
+  topThreeSharePct: number | null;
+  /** Their surnames, in the order they earn. */
+  topThreeNames: string[];
   playerCount: number;
+  /** Rule 4.9 — counted apart from the 15. */
+  twoWayCount: number;
+  /** Article 6 — what this payroll could still sign with, that season. */
+  exceptions: {
+    key: string;
+    label: string;
+    /** Null for the minimum, which has no single figure. */
+    amount: number | null;
+    available: boolean;
+    why: string | null;
+  }[];
 };
 
 export type PayrollOutlook = {

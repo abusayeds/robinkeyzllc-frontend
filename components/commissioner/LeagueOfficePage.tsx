@@ -174,6 +174,17 @@ export default function LeagueOfficePage() {
     const list: { label: string; sub: string; href: string; tone: string }[] =
       [];
 
+    // Listed first and in red: a trade both owners have agreed to is frozen
+    // until a commissioner acts, and nothing on this page said so.
+    if (data.attention.tradesAwaitingApproval > 0) {
+      const count = data.attention.tradesAwaitingApproval;
+      list.push({
+        label: `${count} trade${count === 1 ? "" : "s"} waiting on your approval`,
+        sub: "Both teams have accepted. Approve or veto them in the Action Center.",
+        href: "/league-office/action-center",
+        tone: "bg-red-500",
+      });
+    }
     if (data.attention.pendingInvites > 0) {
       list.push({
         label: `${data.attention.pendingInvites} invite${data.attention.pendingInvites === 1 ? "" : "s"} awaiting a reply`,

@@ -186,8 +186,14 @@ export default function AddAssetModal({
   const isPicked = (asset: PickedAsset) =>
     picked.some((other) => assetKey(other) === assetKey(asset));
 
+  // Rule 7.4 — an exception its holder adds is one he is using to take a
+  // player in, so it stays with him. Trading the exception itself away is a
+  // different move (Rule 7.5), chosen on the asset's own row.
   const add = (asset: PickedAsset) =>
-    onToggle({ ...asset, toTeamId: defaultTo });
+    onToggle({
+      ...asset,
+      toTeamId: asset.kind === "tradeException" ? team.id : defaultTo,
+    });
 
   const total =
     (roster?.players ?? []).length + allPicks.length + exceptions.length;
@@ -485,7 +491,7 @@ export default function AddAssetModal({
                   const asset: PickedAsset = {
                     kind: "tradeException",
                     fromTeamId: team.id,
-                    toTeamId: defaultTo,
+                    toTeamId: team.id,
                     tradeExceptionId: exception.id,
                     label: exception.label,
                     salary: 0,

@@ -108,6 +108,8 @@ export type LeagueSettings = {
   freeAgencyStyle: FreeAgencyStyle;
   trading: TradingRules;
   salaryCap: number;
+  /** Article 2 — the rate future league years are projected at, per cent. */
+  capGrowthPct: number;
   minPlayerSalary: number;
   hardCapEnabled: boolean;
   hardCapThreshold: HardCapThreshold;
@@ -123,6 +125,7 @@ export type LeagueSettingsPatch = Partial<
     setupMode: LeagueSetupMode;
     freeAgencyStyle: FreeAgencyStyle;
     salaryCap: number;
+    capGrowthPct: number;
     minPlayerSalary: number;
     hardCapEnabled: boolean;
     hardCapThreshold: HardCapThreshold;

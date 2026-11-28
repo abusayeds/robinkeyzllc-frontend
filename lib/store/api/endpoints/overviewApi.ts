@@ -64,6 +64,8 @@ export type LeagueOverview = {
   attention: {
     pendingInvites: number;
     pendingOffers: number;
+    /** Both teams accepted; this league makes the commissioner sign off. */
+    tradesAwaitingApproval: number;
     teamsWithoutOwner: number;
     overRoster: {
       id: number;

@@ -445,35 +445,42 @@ export default function PayrollSimulatorPage() {
                   >
                     <td className="truncate px-4 py-2 font-medium text-brand-dark">
                       {row.name}
-                      {row.isHypothetical ? (
-                        <span className="ml-1.5 rounded bg-brand-cta/15 px-1 py-0.5 text-[10px] font-bold text-brand-cta-dark">
-                          what if
-                        </span>
-                      ) : null}
                     </td>
                     {seasons.map((year) => (
                       <td key={year} className="px-3 py-1.5">
                         <NumberField
                           value={row.salaries[year] ?? 0}
                           onChange={(value) => setSalary(row.key, year, value)}
+                          // Dollars read as dollars. The parser already
+                          // strips anything that is not a digit, so the
+                          // separators never reach the figure.
+                          formatter={(v) => v.toLocaleString("en-US")}
                           className="w-full rounded-lg border border-brand-border px-2 py-1 text-right text-xs text-brand-dark outline-none focus:border-brand-cta"
                         />
                       </td>
                     ))}
                     <td className="px-3 py-1.5 text-right">
-                      {row.isHypothetical ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setRows((prev) =>
-                              prev.filter((r) => r.key !== row.key),
-                            )
-                          }
-                          className="rounded p-1 text-brand-muted transition hover:bg-brand-soft hover:text-red-500"
-                        >
-                          <FiTrash2 className="h-3.5 w-3.5" />
-                        </button>
-                      ) : null}
+                      {/* Any row can be taken out, not only one that was
+                          added: dropping a contract is half of what a
+                          simulator is for, and nothing here touches the
+                          real roster. */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRows((prev) =>
+                            prev.filter((r) => r.key !== row.key),
+                          )
+                        }
+                        aria-label={`Remove ${row.name} from this scenario`}
+                        title={
+                          row.isHypothetical
+                            ? "Remove this hypothetical signing"
+                            : "Take this contract out of the scenario"
+                        }
+                        className="rounded p-1 text-brand-muted transition hover:bg-brand-soft hover:text-red-500"
+                      >
+                        <FiTrash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}

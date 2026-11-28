@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FiAlertTriangle, FiX } from "react-icons/fi";
+import { FiAlertTriangle, FiCheck, FiX } from "react-icons/fi";
 import {
   BIRD_LABEL,
   type FreeAgent,
@@ -9,6 +9,7 @@ import {
   type OfferInput,
 } from "@/lib/store/api/endpoints/freeAgencyApi";
 import NumberField from "@/components/ui/NumberField";
+import Toggle from "@/components/ui/Toggle";
 import { money, offerBreakdown, offerTotal, seasonLabel } from "./contract";
 
 const CONTRACT_TYPES = [
@@ -85,6 +86,9 @@ export default function OfferSheetModal({
   const [signedVia, setSignedVia] = useState("capSpace");
   // Rule 10.6 — a player or team option on the final season. "" is no option.
   const [finalYearOption, setFinalYearOption] = useState("");
+  // Appendix B item 7 — the owner's ranking input. Kept as text so an empty
+  // box stays empty rather than reading as a rank of zero.
+  const [rank, setRank] = useState("");
   // Rule 10.1 — what each season is guaranteed for, by season index. Only read
   // for a partially guaranteed offer; the other types say it by their name.
   const [guarantees, setGuarantees] = useState<number[]>([]);
@@ -104,6 +108,11 @@ export default function OfferSheetModal({
     setContractType(existing?.contractType ?? "standard");
     setSignedVia(existing?.signedVia ?? "capSpace");
     setFinalYearOption(existing?.finalYearOption ?? "");
+    setRank(
+      existing?.rank === null || existing?.rank === undefined
+        ? ""
+        : String(existing.rank),
+    );
     setGuarantees(existing?.guaranteedAmounts ?? []);
   }, [player, existing, team]);
 
@@ -118,6 +127,17 @@ export default function OfferSheetModal({
   }, [onClose]);
 
   const isTwoWay = contractType === "twoWay";
+
+  // Rule 10.2 — 0-6, 7-9 and 10+ years of service. A player the league has
+  // no experience figure for is treated as a rookie, which is the lowest of
+  // the three and so the one that cannot let an illegal offer through.
+  const maxForHim = (() => {
+    if (!team) return 0;
+    const years = player?.experience ?? 0;
+    if (years >= 10) return team.maxSalary10Plus;
+    if (years >= 7) return team.maxSalary7to9;
+    return team.maxSalary0to6;
+  })();
 
   // Rule 10.6 — nothing to put an option on once the deal is one year, and a
   // two-way contract carries none at all.
@@ -251,7 +271,24 @@ export default function OfferSheetModal({
         </div>
 
         <div className="space-y-4 px-5 py-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
+                Contract type
+              </span>
+              <select
+                value={contractType}
+                onChange={(e) => setContractType(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-cta"
+              >
+                {CONTRACT_TYPES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <label className="block">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
                 Years
@@ -288,6 +325,52 @@ export default function OfferSheetModal({
             </label>
           </div>
 
+          <label className="block">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
+              Rank
+            </span>
+            <input
+              type="number"
+              min={1}
+              value={rank}
+              onChange={(e) => setRank(e.target.value)}
+              placeholder="000"
+              className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-cta"
+            />
+            <span className="mt-1 block text-[11px] text-brand-muted">
+              Where this owner ranks him. Stored with the offer; no rule turns
+              it into a salary yet.
+            </span>
+          </label>
+
+          {/* Rule 10.2 — the ceiling depends on his years of service, so the
+              shortcut fills in his, not the highest of the three. */}
+          {!isTwoWay && maxForHim > 0 ? (
+            <label className="flex items-center justify-between gap-3 rounded-lg border border-brand-border px-3 py-2.5">
+              <span>
+                <span className="block text-sm font-semibold text-brand-dark">
+                  Use maximum?
+                </span>
+                <span className="block text-[11px] text-brand-muted">
+                  Apply the league maximum for his years of service (
+                  {money(maxForHim)}).
+                </span>
+              </span>
+              <Toggle
+                label="Use the league maximum for this player"
+                showState={false}
+                checked={firstYearSalary === maxForHim}
+                onChange={(on) =>
+                  setFirstYearSalary(
+                    on
+                      ? maxForHim
+                      : (player.previousSalary ?? team?.minPlayerSalary ?? 0),
+                  )
+                }
+              />
+            </label>
+          ) : null}
+
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
               First year salary
@@ -308,23 +391,6 @@ export default function OfferSheetModal({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
-                Contract type
-              </span>
-              <select
-                value={contractType}
-                onChange={(e) => setContractType(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-brand-border px-3 py-2 text-sm outline-none focus:border-brand-cta"
-              >
-                {CONTRACT_TYPES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <label className="block">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
                 Signed via
@@ -508,17 +574,52 @@ export default function OfferSheetModal({
           ) : null}
 
           {warnings.length > 0 ? (
-            <ul className="space-y-1 rounded-lg bg-amber-50 px-3 py-2">
-              {warnings.map((warning) => (
-                <li
-                  key={warning}
-                  className="flex items-start gap-2 text-xs text-amber-700"
-                >
-                  <FiAlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  {warning}
-                </li>
-              ))}
-            </ul>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
+                <FiAlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                {warnings.length} rule
+                {warnings.length === 1 ? "" : "s"} to look at
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {warnings.map((warning) => (
+                  <li
+                    key={warning}
+                    className="flex items-start gap-2 text-xs text-amber-700"
+                  >
+                    <FiAlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {warning}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11px] text-amber-700/80">
+                An offer that breaks a rule can still be sent; the commissioner
+                decides what to do about it.
+              </p>
+            </div>
+          ) : team ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                <FiCheck className="h-3.5 w-3.5 shrink-0" />
+                Offer is legal
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {[
+                  "Salary cap rules satisfied",
+                  "Max contract rules satisfied",
+                  "Raise limits satisfied",
+                  "Contract length valid",
+                  "Valid signing method",
+                ].map((line) => (
+                  <li
+                    key={line}
+                    className="flex items-start gap-2 text-xs text-emerald-700"
+                  >
+                    <FiCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
 
           {error ? (
@@ -553,6 +654,7 @@ export default function OfferSheetModal({
                   contractType,
                   signedVia: isTwoWay ? "capSpace" : signedVia,
                   finalYearOption: finalYearOption || undefined,
+                  rank: rank.trim() === "" ? undefined : Number(rank),
                   // Sent only when the type asks for it, and always one figure
                   // per season so the server's length check reads true.
                   guaranteedAmounts: isPartial

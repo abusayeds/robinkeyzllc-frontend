@@ -36,6 +36,12 @@ export type Offer = {
   signedVia: string;
   /** Rule 10.6 — 'player' or 'team' on the final season, or null. */
   finalYearOption: string | null;
+  /**
+   * Appendix B item 7 — the owner's ranking input, as entered. Recorded
+   * only: the rule that turns a rank into a starting salary is the one the
+   * rule book still leaves undefined.
+   */
+  rank: number | null;
   totalValue: number;
   /** What each year of the offer pays, worked out once on the server. */
   schedule: { yearIndex: number; salary: number }[];
@@ -43,6 +49,8 @@ export type Offer = {
   guaranteedAmounts: number[];
   checks: OfferCheck[];
   isLegal: boolean;
+  /** Other teams bidding on the same player. Their terms stay hidden. */
+  competingOffers: number;
   expiresAt: string | null;
   respondedAt: string | null;
   createdAt: string;
@@ -59,9 +67,13 @@ export type Offer = {
     id: number;
     name: string;
     position: string | null;
+    headshot: string | null;
     birdYears: number;
     status: string;
     currentTeam: { id: number; name: string; abbr: string } | null;
+    /** The same season line the board shows, for the card's summary row. */
+    age: number | null;
+    stats: FreeAgentLine | null;
   };
 };
 
@@ -97,6 +109,8 @@ export type PoolOffer = {
   finalYearOption: string | null;
   /** Rule 10.1 — one figure per season, and empty for every other type. */
   guaranteedAmounts: number[];
+  /** Appendix B item 7 — the owner's ranking input, as entered. */
+  rank: number | null;
   totalValue: number;
   expiresAt: string | null;
   createdAt: string;
@@ -108,6 +122,8 @@ export type FreeAgent = {
   playerId: number;
   name: string;
   position: string | null;
+  /** The feed's headshot, or null for a player it has no picture of. */
+  headshot: string | null;
   nbaTeam: string | null;
   experience: number | null;
   experienceIsEstimated: boolean;
@@ -116,9 +132,37 @@ export type FreeAgent = {
   status: string;
   faType: "UFA" | "RFA";
   rightsTeam: { id: number; name: string; abbr: string } | null;
+  /** Rule 9.1 — the team his bird years were earned under, if anyone's. */
+  birdRightsTeam: { id: number; name: string; abbr: string } | null;
+  /** From the feed's published averages, so null before a season is synced. */
+  age: number | null;
+  stats: FreeAgentLine | null;
   /** What he was paid in the last season of his previous deal, if any. */
   previousSalary: number | null;
   offers: PoolOffer[];
+};
+
+/** This season's per-game line, as the player card reads it. */
+export type FreeAgentLine = {
+  gamesPlayed: number;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  to: number;
+  threes: number;
+  /** Whole percent. */
+  fgPct: number;
+  ftPct: number;
+};
+
+/** Article 6 — one signing tool and whether this payroll may use it. */
+export type CapException = {
+  key: string;
+  label: string;
+  amount: number;
+  available: boolean;
 };
 
 export type MyTeamBudget = {
@@ -128,12 +172,30 @@ export type MyTeamBudget = {
   color: string;
   logo: string | null;
   salaryCap: number;
+  /** False for a league year whose figures nobody has entered. */
+  capIsSet: boolean;
   minPlayerSalary: number;
   maxPlayerSalary: number;
+  /** Rule 10.2 — the ceiling for each band of years of service. */
+  maxSalary0to6: number;
+  maxSalary7to9: number;
+  maxSalary10Plus: number;
+  /** What the team already owes this season. */
   committed: number;
+  /** Room under each line, signed: negative means over it. */
   capSpace: number | null;
+  luxuryTax: number;
+  luxuryTaxRoom: number | null;
+  firstApron: number;
+  firstApronRoom: number | null;
+  secondApron: number;
+  secondApronRoom: number | null;
+  tier: string;
+  tierLabel: string;
+  exceptions: CapException[];
   rosterCount: number;
   maxRosterSize: number;
+  rosterSpotsFree: number;
   twoWayCount: number;
   maxTwoWay: number;
   hardCapEnabled: boolean;
@@ -150,6 +212,8 @@ export type FreeAgentPool = {
 };
 
 export type OfferInput = {
+  /** Appendix B item 7 — the owner's ranking input, recorded as entered. */
+  rank?: number;
   leaguePlayerId: number;
   years: number;
   firstYearSalary: number;

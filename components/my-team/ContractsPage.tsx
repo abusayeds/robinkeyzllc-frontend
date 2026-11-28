@@ -10,8 +10,15 @@ import {
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import { usePayrollOutlookQuery } from "@/lib/store/api/endpoints/salaryApi";
-import CapSummaryCards from "./CapSummaryCards";
+import { useLeagueSettingsQuery } from "@/lib/store/api/endpoints/leagueSettingsApi";
+import { useTradeExceptionsQuery } from "@/lib/store/api/endpoints/tradeApi";
 import ContractsTable from "./ContractsTable";
+import SeasonCapOverview from "./SeasonCapOverview";
+import {
+  RosterAndDeadMoneyStrip,
+  SeasonExceptionsCard,
+  TradeExceptionsCard,
+} from "./ContractsExtras";
 import {
   ContractBreakdownCard,
   FutureOutlookCard,
@@ -23,9 +30,14 @@ import { CONTRACTS_SUBNAV } from "./subnav";
 import TeamSelector from "./TeamSelector";
 import { useViewedTeam } from "./viewedTeam";
 
-/** How many seasons the contract grid shows, matching the import template. */
-/** Match Payroll Simulator / league pick window (default 7 seasons). */
-const SEASON_COLUMNS = 7;
+/**
+ * How many seasons the grid falls back to before the outlook has loaded.
+ *
+ * The real span is the league's own pick-trading window, which the outlook
+ * is built from: the client's rule is that every table showing future league
+ * years shows the same number of them.
+ */
+const FALLBACK_SEASON_COLUMNS = 7;
 
 export default function ContractsPage() {
   const pathname = usePathname();
@@ -54,6 +66,9 @@ export default function ContractsPage() {
   );
 
   const [detail, setDetail] = useState<number | null>(null);
+  // Which year card is open. The panel and the grid read the same one, which
+  // is what makes a card worth clicking.
+  const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [extending, setExtending] = useState<RosterPlayer | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -69,13 +84,27 @@ export default function ContractsPage() {
     { skip: !leagueId || !activeTeamId },
   );
 
+  const { data: settings } = useLeagueSettingsQuery(leagueId as number, {
+    skip: !leagueId,
+  });
+
+  // Article 7 — what this team holds. Read here rather than inside the card
+  // so the page can skip it entirely for a league with exceptions turned off.
+  const { data: tradeExceptions = [] } = useTradeExceptionsQuery(
+    { leagueId: leagueId as number, teamId: activeTeamId as number },
+    { skip: !leagueId || !activeTeamId },
+  );
+
   const seasons = useMemo(() => {
+    if (outlook && outlook.seasons.length > 0) {
+      return outlook.seasons.map((season) => season.seasonStartYear);
+    }
     if (!data) return [];
     return Array.from(
-      { length: SEASON_COLUMNS },
+      { length: FALLBACK_SEASON_COLUMNS },
       (_, index) => data.seasonStartYear + index,
     );
-  }, [data]);
+  }, [outlook, data]);
 
   if (!leagueId) {
     return (
@@ -151,12 +180,37 @@ export default function ContractsPage() {
         <p className="text-sm text-brand-muted">Loading…</p>
       ) : (
         <>
-          <CapSummaryCards
-            leagueId={leagueId}
-            teamId={activeTeamId as number}
-            cap={data.cap}
-            counts={data.counts}
-            rules={data.rules}
+          {outlook && outlook.seasons.length > 0 ? (
+            <>
+              <SeasonCapOverview
+                seasons={outlook.seasons}
+                selected={openSeason ?? outlook.seasons[0].seasonStartYear}
+                onSelect={setOpenSeason}
+                capGrowthPct={settings?.capGrowthPct ?? null}
+              />
+
+              <SeasonExceptionsCard
+                season={
+                  outlook.seasons.find(
+                    (season) => season.seasonStartYear === openSeason,
+                  ) ?? outlook.seasons[0]
+                }
+              />
+            </>
+          ) : null}
+
+          <RosterAndDeadMoneyStrip
+            standard={data.counts.standard}
+            twoWay={data.counts.twoWay}
+            maxRosterSize={data.rules?.maxRosterSize ?? 0}
+            maxTwoWay={data.rules?.maxTwoWay ?? 0}
+            deadMoneyRows={data.deadMoneyRows}
+            seasonStartYear={data.seasonStartYear}
+          />
+
+          <TradeExceptionsCard
+            exceptions={tradeExceptions}
+            canTrade={isMyTeam}
           />
 
           {data.players.length === 0 ? (

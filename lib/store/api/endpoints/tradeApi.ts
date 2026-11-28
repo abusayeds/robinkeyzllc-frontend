@@ -134,6 +134,8 @@ export type TradeExceptionRow = {
   label: string;
   amount: number;
   remaining: number;
+  /** Rule 7.3 — earned here, and expires a year later. */
+  createdAt: string;
   expiresAt: string;
   team: { id: number; name: string; abbr: string };
 };
@@ -191,6 +193,10 @@ export type EvaluatedTeam = {
   rosterAfter: number;
   maxRosterSize: number;
   rosterMinimum: number;
+  /** Rule 4.9 — the two-way pool, which holds none of the standard spots. */
+  twoWayBefore: number;
+  twoWayAfter: number;
+  maxTwoWay: number;
   lines: CapLine[];
   /** Rule 5 — the most this team may take back, when salary matching is on. */
   maxIncoming: number | null;

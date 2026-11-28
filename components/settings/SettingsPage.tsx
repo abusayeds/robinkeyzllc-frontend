@@ -389,7 +389,11 @@ function ChangePasswordCard() {
 function ContentTab({ type }: { type: LeagueContentType }) {
   const activeLeague = useAppSelector((s) => s.activeLeague.current);
   const leagueId = activeLeague?.id;
-  const canEdit = canManageLeague(activeLeague);
+  // These four pages are read by everyone and written by the Super Admin
+  // alone, so a commissioner sees them exactly as a team owner does. The
+  // route refuses anyone else as well; this only keeps the box off a screen
+  // whose Save could never work.
+  const canEdit = useAppSelector((s) => s.auth.user?.role) === "superAdmin";
 
   const {
     data: entries,
@@ -467,7 +471,7 @@ function ContentTab({ type }: { type: LeagueContentType }) {
           <p className="mt-0.5 text-xs text-brand-muted">
             {canEdit
               ? `Shown to everyone in ${activeLeague?.name}.`
-              : `Written by the commissioner of ${activeLeague?.name}.`}
+              : "Maintained by the AVORA team."}
           </p>
         </div>
         {entry?.source === "platform" ? (

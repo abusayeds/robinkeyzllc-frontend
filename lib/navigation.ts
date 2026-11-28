@@ -101,9 +101,10 @@ export const dashboardNav: NavSection[] = [
   {
     title: "MY TEAM",
     items: [
-      // V1: picking a team under My Team opens the Team Dashboard, not the
-      // roster page. Roster stays reachable from the dashboard / contracts.
-      { label: "My Team", href: "/dashboard", icon: HiOutlineUserGroup },
+      // V4: the menu link goes to the My Team page itself. Opening the
+      // Dashboard from here was read as the two being the same screen; it is
+      // the team card on Avora Home that lands on the Dashboard.
+      { label: "My Team", href: "/my-team", icon: HiOutlineUserGroup },
       {
         label: "Contracts",
         href: "/my-team/contracts",
@@ -262,7 +263,7 @@ export const adminNav: NavSection[] = [
         icon: HiOutlineDocumentText,
       },
       {
-        label: "Player Birthdates",
+        label: "Birthdates & Experience",
         href: "/platform/birthdates",
         icon: TbCake,
       },
@@ -328,10 +329,11 @@ export const pageSubtitles: Record<string, string> = {
   "/platform/contracts":
     "Load the global contract database Startup Draft reads when a player is picked.",
   "/platform/birthdates":
-    "Load player birthdates from a CSV. The NBA data feed does not carry them.",
+    "Load player birthdates and years of service from a CSV. The NBA data feed carries neither.",
   "/platform/nba-data":
     "Pull season averages, career stats, game lines and injuries from the NBA feed.",
   "/platform/settings": "Manage your admin profile and system configurations.",
+  "/my-team": "Your roster, contracts and roster health at a glance.",
   "/settings": "Manage your profile and your league's information pages.",
   "/settings/profile": "Your account details and password.",
   "/settings/help": "Help and support for this league.",
@@ -361,7 +363,7 @@ export const pageTitles: Record<string, string> = {
   "/platform/leagues": "Leagues",
   "/platform/salary-cap": "Salary Cap Settings",
   "/platform/contracts": "Player Contracts",
-  "/platform/birthdates": "Player Birthdates",
+  "/platform/birthdates": "Player Birthdates & Experience",
   "/platform/nba-data": "NBA Data Sync",
   "/platform/settings": "Settings",
   "/dashboard": "Dashboard",

@@ -74,10 +74,16 @@ export default function PendingTradesTab({
 
   const busy = responding || withdrawing;
 
-  const { data: detail } = useTradeQuery(
+  // `data` keeps the last successful result after the query is skipped, so
+  // closing the modal left `detail` filled and the modal rendered itself
+  // straight back — which is why neither the X, the Close button nor
+  // accepting the trade appeared to do anything. What is open is decided by
+  // `openId` alone; the fetched row only fills it in.
+  const { data: fetchedTrade } = useTradeQuery(
     { leagueId, tradeId: openId as number },
     { skip: openId === null },
   );
+  const detail = openId === null ? undefined : fetchedTrade;
 
   const { sent, received, awaiting, declined } = useMemo(() => {
     const mineFirst = trades.filter((trade) => trade.proposedBy?.id === userId);

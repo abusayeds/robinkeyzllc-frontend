@@ -14,14 +14,14 @@ import {
 import { useMyLeaguesQuery } from "@/lib/store/api/endpoints/leagueApi";
 import { useAppSelector } from "@/lib/store/hooks";
 import PlayerDetailModal from "@/components/my-team/PlayerDetailModal";
-import CapOverview from "./CapOverview";
+import CapOverview, { CapExceptionStrip } from "./CapOverview";
 import CompetingOffersModal from "./CompetingOffersModal";
 import FreeAgentTable from "./FreeAgentTable";
 import OfferHistoryTab from "./OfferHistoryTab";
 import OfferSheetModal from "./OfferSheetModal";
 import WithdrawOfferModal from "./WithdrawOfferModal";
 
-const TABS = ["All Players", "Signed Players", "Pending Offers"] as const;
+const TABS = ["All Players", "Signed Players", "Offer Sheet History"] as const;
 type Tab = (typeof TABS)[number];
 
 const ALL_POSITIONS = "All Positions";
@@ -35,6 +35,7 @@ const errorText = (error: unknown, fallback: string) => {
 export default function FreeAgencyPage() {
   const activeLeague = useAppSelector((s) => s.activeLeague.current);
   const leagueId = activeLeague?.id;
+  const userName = useAppSelector((s) => s.auth.user?.name);
 
   // Which team the signed-in user holds here. The active league only records
   // that they have one, not which, so the membership list is the source.
@@ -42,7 +43,8 @@ export default function FreeAgencyPage() {
     skip: !leagueId,
   });
   const myTeamId = useMemo(
-    () => memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
+    () =>
+      memberships.find((league) => league.id === leagueId)?.team?.id ?? null,
     [memberships, leagueId],
   );
 
@@ -92,8 +94,7 @@ export default function FreeAgencyPage() {
   }, [pool, search, position, type]);
 
   const myOffers = useMemo(
-    () =>
-      (board?.offers ?? []).filter((offer) => offer.team.id === myTeamId),
+    () => (board?.offers ?? []).filter((offer) => offer.team.id === myTeamId),
     [board, myTeamId],
   );
   const pendingCount = myOffers.filter((o) => o.status === "pending").length;
@@ -111,7 +112,7 @@ export default function FreeAgencyPage() {
     try {
       await submitOffer({ leagueId, teamId: myTeamId, offer }).unwrap();
       setOfferFor(null);
-      setTab("Pending Offers");
+      setTab("Offer Sheet History");
     } catch (e) {
       setError(errorText(e, "That offer could not be sent."));
     }
@@ -162,33 +163,43 @@ export default function FreeAgencyPage() {
         </div>
       ) : null}
 
-      <CapOverview team={pool?.team ?? null} />
+      {/* The design names the league and the owner under the team; only
+          the page knows either. */}
+      <CapOverview
+        team={pool?.team ?? null}
+        subtitle={
+          [activeLeague?.name, userName ? `GM ${userName}` : null]
+            .filter(Boolean)
+            .join(" · ") || null
+        }
+      />
 
-      <div className="flex flex-wrap items-center border-b border-brand-border">
-        {TABS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => setTab(item)}
-            className={`relative px-3 py-2.5 text-sm transition ${
-              tab === item
-                ? "font-semibold text-brand-cta-dark"
-                : "font-medium text-brand-muted hover:text-brand-dark"
-            }`}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {item}
-              {item === "Pending Offers" && pendingCount > 0 ? (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-cta px-1 text-[10px] font-bold text-white">
-                  {pendingCount}
-                </span>
-              ) : null}
-            </span>
-            {tab === item ? (
-              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-cta" />
-            ) : null}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-brand-border bg-white p-1">
+          {TABS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setTab(item)}
+              className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                tab === item
+                  ? "bg-brand-cta/15 font-semibold text-brand-cta-dark"
+                  : "font-medium text-brand-muted hover:text-brand-dark"
+              }`}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                {item}
+                {item === "Offer Sheet History" && pendingCount > 0 ? (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-cta px-1 text-[10px] font-bold text-white">
+                    {pendingCount}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <CapExceptionStrip team={pool?.team ?? null} />
       </div>
 
       {isLoading ? <p className="text-sm text-brand-muted">Loading…</p> : null}
@@ -265,21 +276,30 @@ export default function FreeAgencyPage() {
             No players signed this off-season yet.
           </div>
         ) : (
-          <OfferHistoryTab
-            offers={signed}
-            seasonStartYear={
-              pool?.seasonStartYear ?? board?.seasonStartYear ?? 0
-            }
-            onWithdraw={null}
-          />
+          <OfferHistoryTab offers={signed} onWithdraw={null} />
         )
       ) : null}
 
-      {tab === "Pending Offers" ? (
+      {tab === "Offer Sheet History" ? (
         <OfferHistoryTab
           offers={myOffers}
-          seasonStartYear={pool?.seasonStartYear ?? board?.seasonStartYear ?? 0}
           onWithdraw={setWithdrawTarget}
+          // What the other teams bid, for a player this team has already
+          // bid on — which is the only case the privacy rule allows.
+          onViewOffers={(offer) => {
+            const player = (pool?.players ?? []).find(
+              (row) => row.leaguePlayerId === offer.player.leaguePlayerId,
+            );
+            if (player) setViewOffers(player);
+          }}
+          // Modifying reopens the offer sheet: submitting again replaces the
+          // team's existing bid, which is what the endpoint already does.
+          onModify={(offer) => {
+            const player = (pool?.players ?? []).find(
+              (row) => row.leaguePlayerId === offer.player.leaguePlayerId,
+            );
+            if (player) setOfferFor(player);
+          }}
         />
       ) : null}
 

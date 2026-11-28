@@ -386,8 +386,20 @@ export default function TradeBuilder({
             record={placeOf.get(team.id)?.record ?? null}
             place={placeOf.get(team.id)?.place ?? null}
             evaluation={evaluationFor(team.id)}
-            sending={picked.filter((asset) => asset.fromTeamId === team.id)}
-            receiving={picked.filter((asset) => asset.toTeamId === team.id)}
+            sending={picked.filter(
+              (asset) =>
+                asset.fromTeamId === team.id && asset.toTeamId !== team.id,
+            )}
+            receiving={picked.filter(
+              (asset) =>
+                asset.toTeamId === team.id && asset.fromTeamId !== team.id,
+            )}
+            // An asset that starts and ends on the same team is a trade
+            // exception being spent rather than moved (Rule 7.4).
+            using={picked.filter(
+              (asset) =>
+                asset.fromTeamId === team.id && asset.toTeamId === team.id,
+            )}
             otherTeams={inTrade.filter((other) => other.id !== team.id)}
             onAddAsset={() => setAddAssetFor(team.id)}
             onRemoveAsset={removeAsset}

@@ -86,6 +86,8 @@ type Draft = {
   setupMode: LeagueSetupMode;
   freeAgencyStyle: FreeAgencyStyle;
   trading: TradingRules;
+  /** Article 2 — the rate future league years are projected at. */
+  capGrowthPct: number;
 };
 
 function SettingsCard({
@@ -136,6 +138,7 @@ function toDraft(settings: LeagueSettings, name: string, logo: string | null, is
     setupMode: settings.setupMode,
     freeAgencyStyle: settings.freeAgencyStyle,
     trading: { ...settings.trading },
+    capGrowthPct: settings.capGrowthPct,
   };
 }
 
@@ -498,6 +501,9 @@ export default function CommissionerSettingsPage() {
       settingsPatch.pickTradingWindowDrafts =
         form.trading.pickTradingWindowDrafts;
     }
+    if (form.capGrowthPct !== saved.capGrowthPct) {
+      settingsPatch.capGrowthPct = form.capGrowthPct;
+    }
 
     try {
       if (Object.keys(leaguePatch).length) {
@@ -754,6 +760,37 @@ export default function CommissionerSettingsPage() {
                 className="w-20 rounded-lg border border-brand-border px-3 py-1.5 text-sm text-brand-dark outline-none focus:border-brand-cta disabled:bg-brand-soft disabled:text-brand-muted"
               />
               <span className="text-xs text-brand-muted">drafts</span>
+            </div>
+          }
+        />
+        <Row
+          label="Cap Growth Projection"
+          hint="How much the cap is assumed to rise each league year nobody has entered figures for. Contracts and the Payroll Simulator draw future seasons against it; a year with real figures entered always wins."
+          control={
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={25}
+                step={0.5}
+                value={form.capGrowthPct}
+                disabled={!canEdit}
+                onChange={(e) =>
+                  setForm((f) =>
+                    f
+                      ? {
+                          ...f,
+                          capGrowthPct: Math.min(
+                            25,
+                            Math.max(0, Number(e.target.value) || 0),
+                          ),
+                        }
+                      : f,
+                  )
+                }
+                className="w-20 rounded-lg border border-brand-border px-3 py-1.5 text-sm text-brand-dark outline-none focus:border-brand-cta disabled:bg-brand-soft disabled:text-brand-muted"
+              />
+              <span className="text-xs text-brand-muted">% a year</span>
             </div>
           }
         />

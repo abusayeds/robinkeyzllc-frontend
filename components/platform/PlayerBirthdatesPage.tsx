@@ -167,11 +167,13 @@ export default function PlayerBirthdatesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-brand-dark">Player Birthdates</h1>
+        <h1 className="text-xl font-bold text-brand-dark">
+          Player Birthdates &amp; Experience
+        </h1>
         <p className="text-sm text-brand-muted">
-          The NBA data feed carries no birthdate, so it is loaded here. Two
-          columns, every player in the platform, once — then again for each
-          rookie class.
+          The NBA data feed carries no birthdate and no experience field, so
+          both are loaded here — every player in the platform, once, then
+          again for each rookie class.
         </p>
       </div>
 
@@ -193,11 +195,13 @@ export default function PlayerBirthdatesPage() {
         >
           <FiUploadCloud className="h-8 w-8 text-brand-cta-dark" />
           <p className="mt-2 text-sm font-semibold text-brand-dark">
-            Drop the birthdate CSV here
+            Drop the CSV here
           </p>
-          <p className="mt-0.5 text-xs text-brand-muted">
-            Two columns: <code>player</code> and <code>birthdate</code>, written
-            as 1998-07-12.
+          <p className="mt-0.5 max-w-md text-xs text-brand-muted">
+            <code>player</code>, then <code>birthdate</code> written as
+            1998-07-12, and <code>experience</code> as a whole number of
+            seasons. Either column may be left out, and a blank cell leaves
+            what is stored alone.
           </p>
           <input
             ref={inputRef}

@@ -11,6 +11,7 @@ import {
   type Offer,
   type OfferStatus,
 } from "@/lib/store/api/endpoints/freeAgencyApi";
+import FreeAgentRosterTable from "@/components/commissioner/FreeAgentRosterTable";
 import { canManageLeague } from "@/lib/store/features/activeLeagueSlice";
 import { useAppSelector } from "@/lib/store/hooks";
 import { money } from "@/lib/money";
@@ -223,6 +224,7 @@ export default function FreeAgencyManagementPage() {
   const [term, setTerm] = useState("");
   const [status, setStatus] = useState<OfferStatus | "all">("all");
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"offers" | "players">("offers");
 
   const busy = accepting || declining;
 
@@ -273,18 +275,20 @@ export default function FreeAgencyManagementPage() {
           <p className="text-sm text-brand-muted">
             Every offer sheet in the league for{" "}
             {data ? seasonLabel(data.seasonStartYear) : "this season"}, with the
-            rules each one was judged against.
+            rules each one was judged against, and the free agents themselves.
           </p>
         </div>
-        <div className="relative">
-          <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
-          <input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="Search players or teams"
-            className="w-60 rounded-lg border border-brand-border py-2 pl-9 pr-3 text-sm text-brand-dark outline-none focus:border-brand-cta"
-          />
-        </div>
+        {view === "offers" ? (
+          <div className="relative">
+            <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
+            <input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder="Search players or teams"
+              className="w-60 rounded-lg border border-brand-border py-2 pl-9 pr-3 text-sm text-brand-dark outline-none focus:border-brand-cta"
+            />
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -329,66 +333,102 @@ export default function FreeAgencyManagementPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {STATUS_FILTERS.map((value) => (
+      <div className="flex gap-4 border-b border-brand-border">
+        {(
+          [
+            ["offers", "Offer Sheets"],
+            ["players", "Free Agents"],
+          ] as const
+        ).map(([value, label]) => (
           <button
             key={value}
             type="button"
-            onClick={() => setStatus(value)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              status === value
-                ? "bg-brand-cta text-white"
-                : "border border-brand-border text-brand-muted hover:bg-brand-soft"
+            onClick={() => setView(value)}
+            className={`-mb-px border-b-2 px-1 pb-2 text-sm font-semibold transition ${
+              view === value
+                ? "border-brand-cta text-brand-cta-dark"
+                : "border-transparent text-brand-muted hover:text-brand-dark"
             }`}
           >
-            {value === "all" ? "All" : OFFER_STATUS_LABEL[value]}
+            {label}
           </button>
         ))}
       </div>
 
-      {isLoading ? <p className="text-sm text-brand-muted">Loading…</p> : null}
-
-      {!isLoading && (data?.offers.length ?? 0) === 0 ? (
-        <div className="rounded-xl border border-brand-border bg-white p-8 text-center shadow-card">
-          <p className="text-sm font-semibold text-brand-dark">
-            No offers yet.
-          </p>
-          <p className="mt-1 text-sm text-brand-muted">
-            Team owners put offer sheets on free agents from the Free Agency
-            page. They appear here as they arrive.
-          </p>
-        </div>
+      {view === "players" ? (
+        <FreeAgentRosterTable leagueId={leagueId} canEdit={canEdit} />
       ) : null}
 
-      {!isLoading && offers.length === 0 && (data?.offers.length ?? 0) > 0 ? (
-        <p className="text-sm text-brand-muted">No offers match that filter.</p>
-      ) : null}
+      {view === "offers" ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStatus(value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  status === value
+                    ? "bg-brand-cta text-white"
+                    : "border border-brand-border text-brand-muted hover:bg-brand-soft"
+                }`}
+              >
+                {value === "all" ? "All" : OFFER_STATUS_LABEL[value]}
+              </button>
+            ))}
+          </div>
 
-      <div className="space-y-3">
-        {data
-          ? offers.map((offer) => (
-              <OfferCard
-                key={offer.id}
-                offer={offer}
-                seasonStartYear={data.seasonStartYear}
-                canEdit={canEdit}
-                busy={busy}
-                onAccept={() =>
-                  void run(
-                    () => accept({ leagueId, offerId: offer.id }).unwrap(),
-                    "That offer could not be accepted.",
-                  )
-                }
-                onDecline={() =>
-                  void run(
-                    () => decline({ leagueId, offerId: offer.id }).unwrap(),
-                    "That offer could not be declined.",
-                  )
-                }
-              />
-            ))
-          : null}
-      </div>
+          {isLoading ? (
+            <p className="text-sm text-brand-muted">Loading…</p>
+          ) : null}
+
+          {!isLoading && (data?.offers.length ?? 0) === 0 ? (
+            <div className="rounded-xl border border-brand-border bg-white p-8 text-center shadow-card">
+              <p className="text-sm font-semibold text-brand-dark">
+                No offers yet.
+              </p>
+              <p className="mt-1 text-sm text-brand-muted">
+                Team owners put offer sheets on free agents from the Free Agency
+                page. They appear here as they arrive.
+              </p>
+            </div>
+          ) : null}
+
+          {!isLoading &&
+          offers.length === 0 &&
+          (data?.offers.length ?? 0) > 0 ? (
+            <p className="text-sm text-brand-muted">
+              No offers match that filter.
+            </p>
+          ) : null}
+
+          <div className="space-y-3">
+            {data
+              ? offers.map((offer) => (
+                  <OfferCard
+                    key={offer.id}
+                    offer={offer}
+                    seasonStartYear={data.seasonStartYear}
+                    canEdit={canEdit}
+                    busy={busy}
+                    onAccept={() =>
+                      void run(
+                        () => accept({ leagueId, offerId: offer.id }).unwrap(),
+                        "That offer could not be accepted.",
+                      )
+                    }
+                    onDecline={() =>
+                      void run(
+                        () => decline({ leagueId, offerId: offer.id }).unwrap(),
+                        "That offer could not be declined.",
+                      )
+                    }
+                  />
+                ))
+              : null}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

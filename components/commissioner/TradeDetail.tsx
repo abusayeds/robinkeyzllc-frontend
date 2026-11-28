@@ -97,10 +97,20 @@ export default function TradeDetail({
                   <span className="text-xs font-semibold text-brand-muted">
                     {teamName(asset.fromTeamId)}
                   </span>
-                  <FiArrowRight className="h-3 w-3 text-brand-muted" />
-                  <span className="text-xs font-semibold text-brand-muted">
-                    {teamName(asset.toTeamId)}
-                  </span>
+                  {/* Rule 7.4 — an exception that starts and ends on the same
+                      team is being spent to take a player in, not moved. */}
+                  {asset.fromTeamId === asset.toTeamId ? (
+                    <span className="text-xs font-semibold text-brand-muted">
+                      uses
+                    </span>
+                  ) : (
+                    <>
+                      <FiArrowRight className="h-3 w-3 text-brand-muted" />
+                      <span className="text-xs font-semibold text-brand-muted">
+                        {teamName(asset.toTeamId)}
+                      </span>
+                    </>
+                  )}
                   <span className="font-medium">
                     {asset.player
                       ? asset.player.name

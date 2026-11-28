@@ -118,6 +118,7 @@ export default function TeamPanel({
   evaluation,
   sending,
   receiving,
+  using,
   otherTeams,
   onAddAsset,
   onRemoveAsset,
@@ -134,6 +135,8 @@ export default function TeamPanel({
   evaluation: EvaluatedTeam | null;
   sending: PickedAsset[];
   receiving: PickedAsset[];
+  /** Rule 7.4 — trade exceptions this team is spending, not sending. */
+  using: PickedAsset[];
   otherTeams: TeamCard[];
   onAddAsset: () => void;
   onRemoveAsset: (asset: PickedAsset) => void;
@@ -256,6 +259,38 @@ export default function TeamPanel({
           </>
         ) : null}
 
+        {using.length > 0 ? (
+          <>
+            <p className="pt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-muted">
+              Using ({using.length} trade exception
+              {using.length === 1 ? "" : "s"})
+            </p>
+            {using.map((asset) => (
+              <div
+                key={assetKey(asset)}
+                className="flex items-center justify-between gap-2 rounded-lg border border-brand-border bg-brand-soft/40 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-brand-dark">
+                    {asset.label}
+                  </p>
+                  <p className="truncate text-[11px] text-brand-muted">
+                    {asset.sub ? `${asset.sub} · ` : ""}Absorbs incoming salary
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemoveAsset(asset)}
+                  aria-label={`Remove ${asset.label}`}
+                  className="shrink-0 rounded p-0.5 text-brand-muted transition hover:bg-brand-soft hover:text-brand-dark"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </>
+        ) : null}
+
         <button
           type="button"
           onClick={onAddAsset}
@@ -323,6 +358,18 @@ export default function TeamPanel({
                   evaluation.rosterAfter > evaluation.maxRosterSize ||
                   (evaluation.rosterMinimum > 0 &&
                     evaluation.rosterAfter < evaluation.rosterMinimum)
+                    ? "text-red-500"
+                    : "text-brand-dark"
+                }
+              />
+
+              {/* Rule 4.9 — the two-way pool has a ceiling of its own, so it
+                  is shown beside the roster rather than folded into it. */}
+              <Row
+                label="Two-way"
+                value={`${evaluation.twoWayAfter} of ${evaluation.maxTwoWay}`}
+                tone={
+                  evaluation.twoWayAfter > evaluation.maxTwoWay
                     ? "text-red-500"
                     : "text-brand-dark"
                 }
